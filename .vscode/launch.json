@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Main with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/editor/main.py",
+            "python": "${workspaceFolder}/editor/venv/Scripts/python.exe",
+            "cwd": "${workspaceFolder}/editor",
+            "args": [
+                "--method", "expand",
+                "--input", "stage-2",
+                "--output", "stage-3",
+                "--max-lines", "10"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
