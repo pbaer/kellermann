@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Wilhelm Kellermann – Kriegstagebuch 1939–1945</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<style>
+  html, body { height: 100%; margin: 0; padding: 0; font-family: Georgia, "Times New Roman", serif; }
+  body { display: flex; flex-direction: column; background: #f4f1ea; color: #2a2520; }
+
+  header {
+    padding: 12px 20px 10px;
+    background: #2a2520;
+    color: #f4f1ea;
+    border-bottom: 3px solid #8a6a3a;
+  }
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+  }
+  header h1 .years { color: #c9a86a; }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .scheme-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #c9a86a;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .scheme-select {
+    background: transparent;
+    color: #f4f1ea;
+    border: 1px solid #4a3f32;
+    border-radius: 2px;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+  }
+  .scheme-select:hover { border-color: #c9a86a; }
+  .scheme-select option {
+    background: #2a2520;
+    color: #f4f1ea;
+  }
+
+  .lang-switch {
+    display: inline-flex;
+    border: 1px solid #c9a86a;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .lang-switch button {
+    background: transparent;
+    color: #f4f1ea;
+    border: 0;
+    padding: 4px 12px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+  }
+  .lang-switch button.active {
+    background: #c9a86a;
+    color: #2a2520;
+    font-weight: bold;
+  }
+
+  .chapter-bar {
+    margin-top: 10px;
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .all-btn {
+    background: transparent;
+    color: #f4f1ea;
+    border: 1px solid #4a3f32;
+    border-radius: 2px;
+    padding: 0 14px;
+    font-family: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: stretch;
+    min-height: 36px;
+  }
+  .all-btn:hover { border-color: #c9a86a; }
+  .all-btn.active {
+    background: rgba(201, 168, 106, 0.18);
+    border-color: #c9a86a;
+    color: #fff;
+  }
+
+  .timeline {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 56px;
+  }
+  .timeline-track {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 36px;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid #3a3127;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .timeline-ticks {
+    position: absolute;
+    top: 38px; left: 0; right: 0;
+    height: 16px;
+    pointer-events: none;
+  }
+  .tick {
+    position: absolute;
+    top: 0;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: #8a7a5a;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .tick::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    height: 38px; /* extends up across the track */
+    border-left: 1px dashed rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+
+  .chapter-btn {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: var(--ch-color);
+    color: #fff;
+    border: 0;
+    border-right: 1px solid rgba(0,0,0,0.35);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+  .chapter-btn:last-child { border-right: 0; }
+  .chapter-btn:hover { opacity: 0.92; }
+  .chapter-btn.active {
+    opacity: 1;
+    outline: 2px solid #c9a86a;
+    outline-offset: -2px;
+    z-index: 2;
+  }
+  .chapter-btn .num { font-weight: bold; flex-shrink: 0; }
+  .chapter-btn .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+  #map { flex: 1; min-width: 0; height: 100%; }
+
+  .leaflet-tooltip.kb-tooltip {
+    background: #2a2520;
+    color: #f4f1ea;
+    border: 1px solid #c9a86a;
+    border-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    font-family: Georgia, "Times New Roman", serif;
+    width: 320px;
+    max-width: 85vw;
+    white-space: normal;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+  .leaflet-tooltip.kb-tooltip::before { display: none; }
+  .kb-tooltip .kb-date {
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: #c9a86a;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .kb-tooltip .kb-place {
+    font-weight: bold;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+  .kb-tooltip .kb-desc {
+    font-size: 0.82rem;
+    color: #e8e2d4;
+  }
+  .kb-tooltip .kb-entry + .kb-entry {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #4a3f32;
+  }
+
+  /* ---------- Letter pane (in-flow sibling to the map) ---------- */
+  .letter-pane {
+    flex-shrink: 0;
+    width: 0;
+    overflow: hidden;
+    transition: width 0.28s ease;
+    background: #f9f5ec;
+    color: #2a2520;
+  }
+  .letter-pane.open {
+    width: min(440px, 92vw);
+    border-left: 3px solid #8a6a3a;
+    box-shadow: -4px 0 14px rgba(0,0,0,0.12);
+  }
+  .pane-inner {
+    width: min(440px, 92vw);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .pane-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #efe7d4;
+    border-bottom: 1px solid #d9cfb8;
+    gap: 8px;
+  }
+  .pane-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pane-nav-btn {
+    background: transparent;
+    border: 1px solid #c9a86a;
+    border-radius: 2px;
+    color: #4a3f32;
+    padding: 2px 10px 4px;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 28px;
+  }
+  .pane-nav-btn:hover:not(:disabled) {
+    background: rgba(201,168,106,0.18);
+    color: #2a2520;
+  }
+  .pane-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    border-color: #c9bfa3;
+  }
+  .pane-nav-pos {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: #6a5a3a;
+    min-width: 56px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .pane-close {
+    background: transparent;
+    border: 0;
+    color: #4a3f32;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px 2px;
+    font-family: inherit;
+  }
+  .pane-close:hover { color: #2a2520; }
+
+  .pane-header {
+    padding: 16px 22px 14px;
+    border-bottom: 1px solid #d9cfb8;
+    background: #efe7d4;
+  }
+  .pane-header .pane-chapter {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #6a5a3a;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pane-header .pane-chapter .swatch {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.35);
+  }
+  .pane-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: normal;
+    color: #2a2520;
+  }
+  .pane-header .pane-date-range {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: #6a5a3a;
+    font-style: italic;
+  }
+
+  .pane-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 16px 22px 28px;
+  }
+  .pane-section + .pane-section { margin-top: 22px; }
+  .pane-section h3 {
+    margin: 0 0 8px 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a6a3a;
+    font-weight: normal;
+    border-bottom: 1px solid #e0d5bb;
+    padding-bottom: 4px;
+  }
+
+  .visit {
+    padding: 8px 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .visit + .visit { border-top: 1px dashed #d9cfb8; }
+  .visit .v-meta {
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a6a3a;
+    margin-bottom: 2px;
+  }
+  .visit .v-place {
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: #2a2520;
+  }
+  .visit .v-desc { color: #3a322a; }
+
+  .letter {
+    background: #fffaf0;
+    border: 1px solid #e2d5b6;
+    border-left: 3px solid #c9a86a;
+    border-radius: 2px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .letter:last-child { margin-bottom: 0; }
+  .letter .letter-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a6a3a;
+    margin-bottom: 8px;
+  }
+  .letter .letter-meta .from { font-weight: bold; color: #6a5a3a; }
+  .letter .letter-greeting {
+    font-style: italic;
+    margin-bottom: 8px;
+    color: #3a322a;
+  }
+  .letter .letter-body {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: #3a322a;
+  }
+  .letter .letter-body p { margin: 0 0 8px 0; }
+  .letter .letter-body p:last-child { margin-bottom: 0; }
+  .letter .letter-signoff {
+    margin-top: 10px;
+    font-style: italic;
+    color: #6a5a3a;
+    font-size: 0.85rem;
+  }
+  .placeholder-note {
+    background: #fff3d6;
+    border: 1px dashed #c9a86a;
+    color: #6a5a3a;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    line-height: 1.4;
+    border-radius: 2px;
+    margin-bottom: 12px;
+  }
+
+  .kb-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #2a2520;
+    color: #fff;
+    font-family: Georgia, serif;
+    font-size: 0.7rem;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  /* Halo on the marker representing the location currently shown in the pane.
+     Halo color comes from the marker's --halo-color (set inline = chapter color). */
+  .kb-marker.active-pane {
+    transform: scale(1.18);
+    box-shadow:
+      0 0 0 3px var(--halo-color, #c9a86a),
+      0 0 0 6px color-mix(in srgb, var(--halo-color, #c9a86a) 45%, transparent),
+      0 2px 8px rgba(0,0,0,0.55);
+  }
+
+  .loading, .error {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(244, 241, 234, 0.7);
+    font-style: italic;
+    color: #4a3f32;
+    pointer-events: none;
+    z-index: 500;
+  }
+  .error { color: #8a2a2a; font-style: normal; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1>Wilhelm Kellermann <span class="years">1939–1945</span></h1>
+    <div class="header-controls">
+      <label class="scheme-picker">
+        <span class="scheme-label" id="scheme-label">Farben</span>
+        <select id="scheme-select" class="scheme-select"></select>
+      </label>
+      <div class="lang-switch" role="group" aria-label="Sprache / Language">
+        <button id="btn-de" class="active" type="button">DE</button>
+        <button id="btn-en" type="button">EN</button>
+      </div>
+    </div>
+  </div>
+  <div class="chapter-bar">
+    <button id="all-btn" class="all-btn" type="button">All</button>
+    <div class="timeline" id="timeline">
+      <div class="timeline-track" id="chapter-buttons"></div>
+      <div class="timeline-ticks" id="timeline-ticks"></div>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="map" aria-label="map"></div>
+
+  <aside id="letter-pane" class="letter-pane" aria-hidden="true">
+    <div class="pane-inner">
+      <div class="pane-toolbar">
+        <div class="pane-nav">
+          <button type="button" class="pane-nav-btn" id="pane-prev" aria-label="Previous">‹</button>
+          <span class="pane-nav-pos" id="pane-pos"></span>
+          <button type="button" class="pane-nav-btn" id="pane-next" aria-label="Next">›</button>
+        </div>
+        <button type="button" class="pane-close" id="pane-close" aria-label="Close">×</button>
+      </div>
+      <div id="pane-header" class="pane-header"></div>
+      <div id="pane-body" class="pane-body"></div>
+    </div>
+  </aside>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+// Line styles by arrival_mode. The default (no mode set, "march") represents the
+// main military movement and stays solid + opaque. Rail/road/ship are travel
+// movements that move Wilhelm without the unit advancing under fire — drawn
+// dashed and slightly lighter so they recede visually. Dash periods are
+// generous (~30–40 px) so the pattern stays legible even at thin weights.
+const LINE_STYLES = {
+  march: { weight: 2.5, opacity: 0.85, dashArray: null        }, // default
+  rail:  { weight: 1.8, opacity: 0.65, dashArray: '18,8,4,8'  }, // long-short locomotive cadence
+  road:  { weight: 1.8, opacity: 0.65, dashArray: '10,8'      }, // even dashes
+  ship:  { weight: 1.8, opacity: 0.65, dashArray: '2,10'      }  // dotted
+};
+
+// Five chapter color palettes for evaluation. Each has 10 colors (one per chapter).
+// Currently selectable from a header dropdown so the user can pick a default.
+const COLOR_SCHEMES = {
+  era: {
+    name: { de: "Epoche (Standard)", en: "Era (current)" },
+    // Cool blues → summer golds/oranges → deep wine red. Tracks the war's mood arc.
+    // Ch 8 is teal (not steel blue) so it's clearly distinct from Ch 1's deep blue —
+    // both phases play out in northern Germany so they share map space.
+    colors: ['#2e5a88','#3a8a5c','#6a8a3a','#c4a04a','#d97a3a',
+             '#8a4a2a','#c97a8a','#2a807a','#7a3a6a','#6a1a1a']
+  },
+  rainbow: {
+    name: { de: "Regenbogen", en: "Rainbow" },
+    // ROYGBIV extended to 10 stops — clean spectral progression.
+    colors: ['#d6334a','#ee7c30','#f4b942','#cdd148','#6db358',
+             '#2a9d8f','#3a86d9','#5b3a91','#8e3b8e','#c1296b']
+  },
+  earth: {
+    name: { de: "Erde", en: "Earth" },
+    // Military map / topographic palette — olive, sage, khaki, sand, slate.
+    colors: ['#6e7a3a','#4a6c5b','#8b9d6c','#b09a6c','#c19660',
+             '#8b6850','#a8a087','#6b7280','#4a4a4a','#2c2c2c']
+  },
+  sepia: {
+    name: { de: "Sepia", en: "Sepia" },
+    // Single warm hue from light tan to dark walnut — feels like aged paper.
+    colors: ['#e8c79a','#dcb47e','#cfa063','#c08c4a','#a87838',
+             '#8e6128','#754d1d','#5d3c16','#48300f','#36240a']
+  },
+  vivid: {
+    name: { de: "Lebhaft", en: "Vivid" },
+    // Categorical (Tableau-10 inspired) — every chapter has a distinct identity,
+    // no implied progression.
+    colors: ['#4e79a7','#f28e2c','#e15759','#76b7b2','#59a14f',
+             '#edc949','#af7aa1','#ff9da7','#9c755f','#bab0ab']
+  }
+};
+
+const STRINGS = {
+  de: {
+    title: "Wilhelm Kellermann",
+    chapterLabel: "Kapitel",
+    allChapters: "Alle",
+    allChaptersFull: "Alle Kapitel",
+    legendTitle: "Kapitel",
+    approxArea: "Ungefähres Gebiet",
+    loading: "Lade Daten…",
+    loadError: "Fehler beim Laden der Daten.",
+    chapterShort: (n) => `Kapitel ${n}`,
+    arrivalMode: { rail: "per Bahn", road: "auf der Straße", ship: "per Schiff" },
+    schemeLabel: "Farben",
+    prevLocation: "Vorheriger Ort",
+    nextLocation: "Nächster Ort",
+    visitsHeading: "Stationen an diesem Ort",
+    lettersHeading: "Briefe",
+    placeholderNote: "Platzhalter — die strukturierten Brieftexte werden später ergänzt.",
+    fromWilhelm: "von Wilhelm",
+    fromMarianne: "von Marianne",
+    placeGloesa: "Chemnitz-Glösa",
+    enRoute: "unterwegs",
+    letters: [
+      {
+        greeting: "Liebe Marianne!",
+        body: [
+          "Heute hatten wir endlich Quartier in einem festen Haus. Die Fahrt war lang, der Staub fürchterlich, doch der Spies hat uns Kaffee und Brot besorgt. Hier wird später der eigentliche Brieftext aus Wilhelms Feldpost stehen — derzeit nur ein Platzhalter zur Veranschaulichung des Layouts.",
+          "Schreibe mir bitte, sobald Du dieses Schreiben erhalten hast. Über jede Zeile von zu Hause freut man sich hier draußen ganz besonders."
+        ],
+        signoff: "Dein Wilhelm"
+      },
+      {
+        greeting: "Mein lieber Wilhelm,",
+        body: [
+          "Helga hat heute zum ersten Mal beim Laufen nicht mehr gestürzt. Wir waren am Nachmittag bei Frau Behr; sie hat von Herbert seit drei Wochen keine Post. Hier kommt später Mariannes Original-Briefinhalt aus Glösa.",
+          "Vati liegt mit Fieber im Bett, aber der Doktor sagt, es sei nichts Schlimmes. Ich nummeriere meine Briefe weiter — dies ist Nr. 47."
+        ],
+        signoff: "In Liebe, Deine Marianne"
+      },
+      {
+        greeting: "Liebe Marianne!",
+        body: [
+          "Deinen Brief Nr. 45 habe ich gestern erhalten — vielen Dank! Daß Helga jetzt allein laufen kann, kann ich mir kaum vorstellen. Auer und ich teilen uns wieder eine Stube. Platzhaltertext, der später durch das tatsächliche Brieftranskript ersetzt wird.",
+          "Bitte grüße Deine Eltern und küsse Helga von ihrem Vati."
+        ],
+        signoff: "Dein Wilhelm"
+      }
+    ]
+  },
+  en: {
+    title: "Wilhelm Kellermann",
+    chapterLabel: "Chapter",
+    allChapters: "All",
+    allChaptersFull: "All chapters",
+    legendTitle: "Chapters",
+    approxArea: "Approximate area",
+    loading: "Loading data…",
+    loadError: "Failed to load data.",
+    chapterShort: (n) => `Chapter ${n}`,
+    arrivalMode: { rail: "by rail", road: "by road", ship: "by ship" },
+    schemeLabel: "Colors",
+    prevLocation: "Previous location",
+    nextLocation: "Next location",
+    visitsHeading: "Visits to this location",
+    lettersHeading: "Letters",
+    placeholderNote: "Placeholder — the structured letter transcripts will be added later.",
+    fromWilhelm: "from Wilhelm",
+    fromMarianne: "from Marianne",
+    placeGloesa: "Chemnitz-Glösa",
+    enRoute: "en route",
+    letters: [
+      {
+        greeting: "Dearest Marianne,",
+        body: [
+          "Today we finally got quarters in a proper house. The drive was long and the dust dreadful, but the Spieß rounded up coffee and bread for us. Wilhelm's actual field-post letter text will appear here once the transcripts are structured — for now this is just placeholder copy to demonstrate the layout.",
+          "Please write back as soon as you receive this. Every line from home means more out here than I can say."
+        ],
+        signoff: "Your Wilhelm"
+      },
+      {
+        greeting: "My dear Wilhelm,",
+        body: [
+          "Helga managed her first walk today without falling. We visited Frau Behr in the afternoon; she has had no post from Herbert for three weeks. Marianne's original letter text from Glösa will sit here in the final version.",
+          "Father is in bed with a fever, but the doctor says it is nothing serious. I am still numbering my letters — this is no. 47."
+        ],
+        signoff: "With love, your Marianne"
+      },
+      {
+        greeting: "Dearest Marianne,",
+        body: [
+          "Your letter no. 45 arrived yesterday — thank you so much! It is hard to picture Helga walking on her own already. Auer and I are sharing a room again. This is placeholder text, to be replaced by the actual letter transcript later.",
+          "Please give my love to your parents and a kiss to Helga from her Vati."
+        ],
+        signoff: "Your Wilhelm"
+      }
+    ]
+  }
+};
+
+const LOCALE_DIR = { de: 'de-DE', en: 'en-US' };
+
+// -------------------- state --------------------
+
+const state = {
+  lang: 'de',
+  chapter: 'all',     // 'all' or 1..10
+  scheme: 'era',      // key into COLOR_SCHEMES
+  data: { de: null, en: null }, // { manifest, chapters: [{...meta, entries: []}] }
+  map: null,
+  layer: null,
+  openPaneIndices: null,         // global indices of entries currently shown in side pane
+  markersByKey: new Map(),       // 'lat,lon' -> { marker, inner } for halo + nav
+  activeMarkerKey: null          // key of currently haloed marker, if any
+};
+
+// -------------------- helpers --------------------
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function formatDate(iso, lang) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const months = lang === 'de'
+    ? ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember']
+    : ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return `${d}. ${months[m-1]} ${y}`;
+}
+
+function chapterColor(num) {
+  return COLOR_SCHEMES[state.scheme].colors[num - 1];
+}
+
+// -------------------- data loading --------------------
+
+async function loadLang(lang) {
+  if (state.data[lang]) return state.data[lang];
+  const dir = LOCALE_DIR[lang];
+  const manifest = await fetch(`data/${dir}/chapters.json`).then(r => {
+    if (!r.ok) throw new Error(`chapters.json HTTP ${r.status}`);
+    return r.json();
+  });
+  const chapters = await Promise.all(manifest.map(async (m) => {
+    const url = `data/${dir}/chapter-${String(m.number).padStart(2, '0')}/chronology.jsonl`;
+    const text = await fetch(url).then(r => {
+      if (!r.ok) throw new Error(`${url} HTTP ${r.status}`);
+      return r.text();
+    });
+    const entries = text.split('\n')
+      .filter(l => l.trim().length > 0)
+      .map(l => JSON.parse(l));
+    return { ...m, entries };
+  }));
+  // Annotate each entry with its chapter number and a global chronological index.
+  let globalIdx = 0;
+  for (const ch of chapters) {
+    for (const e of ch.entries) {
+      e._chapter = ch.number;
+      e._globalIdx = globalIdx++;
+    }
+  }
+  state.data[lang] = { manifest, chapters, totalEntries: globalIdx };
+  return state.data[lang];
+}
+
+// -------------------- rendering --------------------
+
+function activeEntries() {
+  const d = state.data[state.lang];
+  if (!d) return [];
+  if (state.chapter === 'all') {
+    return d.chapters.flatMap(c => c.entries);
+  }
+  const ch = d.chapters.find(c => c.number === state.chapter);
+  return ch ? ch.entries : [];
+}
+
+function entryByGlobalIdx(lang, idx) {
+  const d = state.data[lang];
+  if (!d) return null;
+  for (const ch of d.chapters) {
+    for (const e of ch.entries) {
+      if (e._globalIdx === idx) return e;
+    }
+  }
+  return null;
+}
+
+function renderMap({ refit = false } = {}) {
+  const lang = state.lang;
+  const s = STRINGS[lang];
+  const entries = activeEntries();
+  state.layer.clearLayers();
+
+  if (entries.length === 0) return;
+
+  // Connecting line — color by the chapter of the segment's starting entry,
+  // so chapter transitions are visible as color shifts in "All" view. Style by
+  // the arrival_mode of the segment's *destination* entry (rail/road/ship are
+  // de-emphasized travel movements; the unstyled default is the main advance).
+  for (let i = 0; i < entries.length - 1; i++) {
+    const a = entries[i], b = entries[i+1];
+    const style = LINE_STYLES[b.arrival_mode] || LINE_STYLES.march;
+    L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
+      color: chapterColor(a._chapter),
+      weight: style.weight,
+      opacity: style.opacity,
+      dashArray: style.dashArray,
+      lineCap: style.dashArray ? 'butt' : 'round'
+    }).addTo(state.layer);
+  }
+
+  // Group by coordinate so revisits to the same location share one marker.
+  const groups = new Map();
+  for (const e of entries) {
+    const key = `${e.lat},${e.lon}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  state.markersByKey.clear();
+
+  // Approximate-area rings (one per location, using max radius)
+  for (const group of groups.values()) {
+    const maxR = Math.max(0, ...group.map(e => e.radius_km || 0));
+    if (maxR > 0) {
+      const first = group[0];
+      const color = chapterColor(first._chapter);
+      L.circle([first.lat, first.lon], {
+        radius: maxR * 1000,
+        color: color,
+        weight: 1,
+        opacity: 0.5,
+        fillColor: color,
+        fillOpacity: 0.1,
+        interactive: false
+      }).addTo(state.layer);
+    }
+  }
+
+  // Markers
+  for (const group of groups.values()) {
+    const first = group[0];
+    const color = chapterColor(first._chapter);
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="kb-marker" style="background:${color};--halo-color:${color}">${first._globalIdx + 1}</div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13]
+    });
+
+    const tooltipHtml = group.map(e => {
+      const modeLabel = e.arrival_mode ? ' · ' + s.arrivalMode[e.arrival_mode] : '';
+      return `
+      <div class="kb-entry">
+        <div class="kb-date">#${e._globalIdx + 1} · ${formatDate(e.arrival_date, lang)}${e.radius_km ? ' · ' + s.approxArea : ''}${modeLabel}</div>
+        <div class="kb-place">${escapeHtml(e.place)}</div>
+        <div class="kb-desc">${escapeHtml(e.description)}</div>
+      </div>
+      `;
+    }).join('');
+
+    const marker = L.marker([first.lat, first.lon], { icon, riseOnHover: true })
+      .addTo(state.layer)
+      .bindTooltip(tooltipHtml, {
+        className: 'kb-tooltip',
+        direction: 'top',
+        offset: [0, -8],
+        opacity: 1
+      });
+
+    // Click opens the side pane; the group's global indices identify the entries
+    // across languages so the pane survives a language switch.
+    const groupIndices = group.map(e => e._globalIdx);
+    marker.on('click', () => {
+      marker.closeTooltip();
+      openLetterPaneByIndices(groupIndices);
+    });
+
+    const wrapper = marker.getElement();
+    const inner = wrapper ? wrapper.querySelector('.kb-marker') : null;
+    state.markersByKey.set(`${first.lat},${first.lon}`, { marker, inner });
+  }
+
+  // Re-apply halo if a pane is open and its location is in the rendered set
+  // (e.g. after a chapter filter or scheme change recreates the markers).
+  state.activeMarkerKey = null;
+  if (state.openPaneIndices) {
+    const e = entryByGlobalIdx(state.lang, state.openPaneIndices[0]);
+    if (e) setActiveMarker(`${e.lat},${e.lon}`);
+  }
+
+  if (refit) {
+    const bounds = L.latLngBounds(entries.map(e => [e.lat, e.lon])).pad(0.1);
+    state.map.fitBounds(bounds, { animate: true });
+  }
+}
+
+// ---- Timeline math ----
+
+function dateMs(iso) {
+  return new Date(iso + 'T00:00:00Z').getTime();
+}
+
+// Returns the timeline span and per-chapter [start, end] in ISO dates.
+// Each chapter ends where the next one begins (so chapters are contiguous);
+// the last chapter ends at its own latest entry date.
+function computeTimeline(chapters) {
+  const starts = chapters.map(ch => {
+    return ch.entries.reduce((min, e) => e.arrival_date < min ? e.arrival_date : min,
+                             ch.entries[0].arrival_date);
+  });
+  const lastChEntries = chapters[chapters.length - 1].entries;
+  const lastDate = lastChEntries.reduce((max, e) => e.arrival_date > max ? e.arrival_date : max,
+                                        lastChEntries[0].arrival_date);
+  const ranges = chapters.map((ch, i) => ({
+    number: ch.number,
+    startIso: starts[i],
+    endIso: i < chapters.length - 1 ? starts[i + 1] : lastDate
+  }));
+  return { startIso: starts[0], endIso: lastDate, ranges };
+}
+
+function yearTicks(startMs, endMs) {
+  const ticks = [];
+  const startYear = new Date(startMs).getUTCFullYear();
+  const endYear = new Date(endMs).getUTCFullYear();
+  for (let y = startYear; y <= endYear; y++) {
+    const yMs = Date.UTC(y, 0, 1);
+    if (yMs >= startMs && yMs <= endMs) ticks.push({ year: y, ms: yMs });
+  }
+  return ticks;
+}
+
+function pct(ms, startMs, endMs) {
+  return ((ms - startMs) / (endMs - startMs)) * 100;
+}
+
+// ---- Header / timeline render ----
+
+function renderChapterBar() {
+  const d = state.data[state.lang];
+  const s = STRINGS[state.lang];
+
+  const allBtn = document.getElementById('all-btn');
+  allBtn.textContent = s.allChapters;
+  allBtn.classList.toggle('active', state.chapter === 'all');
+
+  const track = document.getElementById('chapter-buttons');
+  const ticks = document.getElementById('timeline-ticks');
+  track.innerHTML = '';
+  ticks.innerHTML = '';
+  if (!d) return;
+
+  const tl = computeTimeline(d.chapters);
+  const startMs = dateMs(tl.startIso);
+  const endMs = dateMs(tl.endIso);
+
+  for (const r of tl.ranges) {
+    const m = d.manifest.find(x => x.number === r.number);
+    const left = pct(dateMs(r.startIso), startMs, endMs);
+    const width = pct(dateMs(r.endIso), startMs, endMs) - left;
+    const color = chapterColor(r.number);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chapter-btn' + (state.chapter === r.number ? ' active' : '');
+    btn.dataset.chapter = String(r.number);
+    btn.title = `${m.title} (${m.date_range})`;
+    btn.style.left = `${left}%`;
+    btn.style.width = `${width}%`;
+    btn.style.setProperty('--ch-color', color);
+    btn.style.background = color;
+    btn.innerHTML = `<span class="num">${r.number}.</span><span class="title">${escapeHtml(m.title)}</span>`;
+    btn.addEventListener('click', () => selectChapter(r.number));
+    track.appendChild(btn);
+  }
+
+  for (const t of yearTicks(startMs, endMs)) {
+    const tick = document.createElement('span');
+    tick.className = 'tick';
+    tick.textContent = String(t.year);
+    tick.style.left = `${pct(t.ms, startMs, endMs)}%`;
+    ticks.appendChild(tick);
+  }
+}
+
+// -------------------- letter pane --------------------
+
+function addDays(iso, days) {
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function openLetterPaneByIndices(indices) {
+  const lang = state.lang;
+  const group = indices.map(i => entryByGlobalIdx(lang, i)).filter(Boolean);
+  if (group.length === 0) return;
+
+  const wasOpen = state.openPaneIndices !== null;
+  const prevScroll = wasOpen ? document.getElementById('pane-body').scrollTop : 0;
+  state.openPaneIndices = indices.slice();
+  renderLetterPane(group);
+  setActiveMarker(`${group[0].lat},${group[0].lon}`);
+  renderPaneNav();
+
+  const pane = document.getElementById('letter-pane');
+  pane.classList.add('open');
+  pane.setAttribute('aria-hidden', 'false');
+  // Preserve scroll position on language-swap re-renders; reset on fresh opens.
+  pane.querySelector('.pane-body').scrollTop = wasOpen ? prevScroll : 0;
+}
+
+// Marks one marker as the "current selection" with a gold halo + brings it to
+// front. Passing null removes any existing halo.
+function setActiveMarker(key) {
+  if (state.activeMarkerKey && state.activeMarkerKey !== key) {
+    const prev = state.markersByKey.get(state.activeMarkerKey);
+    if (prev) {
+      if (prev.inner) prev.inner.classList.remove('active-pane');
+      prev.marker.setZIndexOffset(0);
+    }
+  }
+  state.activeMarkerKey = key;
+  if (key) {
+    const cur = state.markersByKey.get(key);
+    if (cur) {
+      if (cur.inner) cur.inner.classList.add('active-pane');
+      cur.marker.setZIndexOffset(1000);
+    }
+  }
+}
+
+// Returns the ordered list of {key, lat, lon, indices} for every unique
+// location in the currently filtered chronological view.
+function activeLocationGroups() {
+  const groups = [];
+  const seen = new Map();
+  for (const e of activeEntries()) {
+    const key = `${e.lat},${e.lon}`;
+    let g = seen.get(key);
+    if (!g) {
+      g = { key, lat: e.lat, lon: e.lon, indices: [] };
+      seen.set(key, g);
+      groups.push(g);
+    }
+    g.indices.push(e._globalIdx);
+  }
+  return groups;
+}
+
+// Navigate to the prev/next location group. Within a chapter (or in All view)
+// the map only pans if the destination isn't already visible. At a chapter
+// boundary in filtered mode, crosses into the adjacent chapter — switches the
+// filter (which refits the map to that chapter's bounds) and opens the new
+// chapter's first or last location.
+function navigateLocations(direction) {
+  if (!state.openPaneIndices) return;
+  const groups = activeLocationGroups();
+  const i = groups.findIndex(g => g.key === state.activeMarkerKey);
+  if (i === -1) return;
+  const target = groups[i + direction];
+  if (target) {
+    openLetterPaneByIndices(target.indices);
+    // panInside is a no-op if the point is already inside (bounds minus padding).
+    state.map.panInside([target.lat, target.lon], { padding: [60, 60] });
+    return;
+  }
+  // Boundary reached. Try to cross into the adjacent chapter (only meaningful
+  // when actually filtered — All view has nowhere to cross to).
+  if (state.chapter === 'all') return;
+  const total = state.data[state.lang].chapters.length;
+  const next = state.chapter + direction;
+  if (next < 1 || next > total) return;
+  setChapter(next);                       // refits map to new chapter's bounds
+  const newGroups = activeLocationGroups();
+  if (newGroups.length === 0) return;
+  const edge = direction > 0 ? newGroups[0] : newGroups[newGroups.length - 1];
+  openLetterPaneByIndices(edge.indices);
+}
+
+function renderPaneNav() {
+  const groups = activeLocationGroups();
+  const prev = document.getElementById('pane-prev');
+  const next = document.getElementById('pane-next');
+  const pos = document.getElementById('pane-pos');
+  const s = STRINGS[state.lang];
+  prev.setAttribute('aria-label', s.prevLocation);
+  next.setAttribute('aria-label', s.nextLocation);
+  prev.title = s.prevLocation;
+  next.title = s.nextLocation;
+  if (!state.openPaneIndices || groups.length === 0) {
+    prev.disabled = true;
+    next.disabled = true;
+    pos.textContent = '';
+    return;
+  }
+  const i = groups.findIndex(g => g.key === state.activeMarkerKey);
+  if (i === -1) {
+    prev.disabled = true;
+    next.disabled = true;
+    pos.textContent = '—';
+    return;
+  }
+  // In a chapter-filtered view, prev/next remain enabled at the edges as long
+  // as there's an adjacent chapter to cross into.
+  const total = state.data[state.lang].chapters.length;
+  const canCrossPrev = state.chapter !== 'all' && state.chapter > 1;
+  const canCrossNext = state.chapter !== 'all' && state.chapter < total;
+  prev.disabled = i === 0 && !canCrossPrev;
+  next.disabled = i === groups.length - 1 && !canCrossNext;
+  pos.textContent = `${i + 1} / ${groups.length}`;
+}
+
+function renderLetterPane(group) {
+  const lang = state.lang;
+  const s = STRINGS[lang];
+  const first = group[0];
+  const last = group[group.length - 1];
+
+  // Header
+  const dateRange = group.length === 1
+    ? formatDate(first.arrival_date, lang)
+    : `${formatDate(first.arrival_date, lang)} – ${formatDate(last.arrival_date, lang)}`;
+
+  // Chapter info: show first entry's chapter; note if the group spans more than one
+  const chapters = [...new Set(group.map(e => e._chapter))].sort((a,b) => a-b);
+  const manifest = state.data[lang].manifest;
+  const chTitles = chapters.map(n => {
+    const m = manifest.find(x => x.number === n);
+    return m ? `${n}. ${m.title}` : `${n}.`;
+  }).join(' · ');
+  const chColor = chapterColor(first._chapter);
+
+  document.getElementById('pane-header').innerHTML = `
+    <div class="pane-chapter">
+      <span class="swatch" style="background:${chColor}"></span>
+      <span>${escapeHtml(chTitles)}</span>
+    </div>
+    <h2>${escapeHtml(first.place)}</h2>
+    <div class="pane-date-range">${escapeHtml(dateRange)}</div>
+  `;
+
+  // Body: visit summaries + placeholder letters
+  const visitsHtml = group.map(e => {
+    const modeLabel = e.arrival_mode ? ' · ' + escapeHtml(s.arrivalMode[e.arrival_mode]) : '';
+    return `
+    <div class="visit">
+      <div class="v-meta">#${e._globalIdx + 1} · ${escapeHtml(formatDate(e.arrival_date, lang))}${e.radius_km ? ' · ' + escapeHtml(s.approxArea) : ''}${modeLabel}</div>
+      <div class="v-place">${escapeHtml(e.place)}</div>
+      <div class="v-desc">${escapeHtml(e.description)}</div>
+    </div>
+    `;
+  }).join('');
+
+  // Three placeholder letters anchored around the first arrival_date
+  const placeFromHere = first.place;
+  const dayOffsets = [-2, 0, 5];
+  const senders = ['wilhelm', 'marianne', 'wilhelm'];
+  const lettersHtml = s.letters.map((tpl, i) => {
+    const sender = senders[i];
+    const senderLabel = sender === 'wilhelm' ? s.fromWilhelm : s.fromMarianne;
+    const fromPlace = sender === 'wilhelm' ? placeFromHere : s.placeGloesa;
+    const date = formatDate(addDays(first.arrival_date, dayOffsets[i]), lang);
+    return `
+      <article class="letter">
+        <div class="letter-meta">
+          <span class="from">${escapeHtml(senderLabel)} · ${escapeHtml(fromPlace)}</span>
+          <span class="date">${escapeHtml(date)}</span>
+        </div>
+        <div class="letter-greeting">${escapeHtml(tpl.greeting)}</div>
+        <div class="letter-body">${tpl.body.map(p => `<p>${escapeHtml(p)}</p>`).join('')}</div>
+        <div class="letter-signoff">${escapeHtml(tpl.signoff)}</div>
+      </article>
+    `;
+  }).join('');
+
+  document.getElementById('pane-body').innerHTML = `
+    <section class="pane-section">
+      <h3>${escapeHtml(s.visitsHeading)}</h3>
+      ${visitsHtml}
+    </section>
+    <section class="pane-section">
+      <h3>${escapeHtml(s.lettersHeading)}</h3>
+      <div class="placeholder-note">${escapeHtml(s.placeholderNote)}</div>
+      ${lettersHtml}
+    </section>
+  `;
+}
+
+function closeLetterPane() {
+  state.openPaneIndices = null;
+  setActiveMarker(null);
+  const pane = document.getElementById('letter-pane');
+  pane.classList.remove('open');
+  pane.setAttribute('aria-hidden', 'true');
+}
+
+// -------------------- overlays --------------------
+
+function showLoading(msg) {
+  hideOverlay();
+  const div = document.createElement('div');
+  div.className = 'loading';
+  div.id = 'overlay';
+  div.textContent = msg;
+  document.getElementById('map').appendChild(div);
+}
+function showError(msg) {
+  hideOverlay();
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.id = 'overlay';
+  div.textContent = msg;
+  document.getElementById('map').appendChild(div);
+}
+function hideOverlay() {
+  const e = document.getElementById('overlay');
+  if (e) e.remove();
+}
+
+// -------------------- actions --------------------
+
+// Synchronous, instant language swap — both languages are pre-loaded at startup,
+// so this only re-renders text without re-fetching, re-fitting the map, or
+// disturbing UI state (chapter filter, map view, open pane, scroll position).
+function setLang(lang) {
+  if (lang === state.lang) return;
+  if (!state.data[lang]) return; // safety: should never happen post-startup
+  state.lang = lang;
+  document.documentElement.lang = lang;
+  document.getElementById('btn-de').classList.toggle('active', lang === 'de');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  renderSchemePicker();                     // labels + option text re-localize
+  renderChapterBar();
+  renderMap();                              // refit=false: preserve current zoom/pan
+  if (state.openPaneIndices) {
+    openLetterPaneByIndices(state.openPaneIndices); // re-render in new lang, keep scroll
+  }
+}
+
+function setChapter(ch) {
+  state.chapter = ch;
+  renderChapterBar();
+  renderMap({ refit: true });
+  renderPaneNav();           // counter / disabled-state depends on filtered set
+}
+
+// Used by the chapter timeline buttons: applies the filter AND opens the side
+// pane on the first location of that chapter, so the user lands directly in
+// the chapter's opening stop. (setChapter alone is the lower-level operation
+// used by navigateLocations, which manages the pane open itself.)
+//
+// Order matters: the pane has to be in its *final* width before fitBounds
+// runs, otherwise the chapter's eastmost markers end up hidden behind the
+// pane's slide-in. When the pane was previously closed we snap it open
+// without animation, force a layout flush, invalidate Leaflet's container
+// size, and only then refit.
+function selectChapter(ch) {
+  state.chapter = ch;
+  renderChapterBar();
+
+  const pane = document.getElementById('letter-pane');
+  const paneWasOpen = pane.classList.contains('open');
+  const groups = activeLocationGroups();
+
+  if (groups.length > 0) {
+    if (!paneWasOpen) {
+      pane.style.transition = 'none';     // skip slide-in for this open
+      openLetterPaneByIndices(groups[0].indices);
+      void pane.offsetWidth;              // force layout flush
+      state.map.invalidateSize();         // Leaflet picks up the smaller width
+      requestAnimationFrame(() => { pane.style.transition = ''; }); // restore animation
+    } else {
+      openLetterPaneByIndices(groups[0].indices);
+    }
+  }
+
+  renderMap({ refit: true });             // fits to chapter bounds in the now-correct map width
+  renderPaneNav();
+}
+
+function setScheme(scheme) {
+  if (!COLOR_SCHEMES[scheme] || scheme === state.scheme) return;
+  state.scheme = scheme;
+  document.getElementById('scheme-select').value = scheme; // keep dropdown in sync
+  renderChapterBar();
+  renderMap();                              // recolor without refitting the view
+  if (state.openPaneIndices) {
+    openLetterPaneByIndices(state.openPaneIndices); // chapter swatch in pane uses scheme
+  }
+}
+
+function renderSchemePicker() {
+  const lang = state.lang;
+  document.getElementById('scheme-label').textContent = STRINGS[lang].schemeLabel;
+  const sel = document.getElementById('scheme-select');
+  sel.innerHTML = '';
+  for (const [key, sch] of Object.entries(COLOR_SCHEMES)) {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = sch.name[lang];
+    if (key === state.scheme) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+async function loadAllLanguages() {
+  showLoading(STRINGS[state.lang].loading);
+  try {
+    await Promise.all([loadLang('de'), loadLang('en')]);
+    hideOverlay();
+  } catch (err) {
+    console.error(err);
+    showError(STRINGS[state.lang].loadError + ' (' + err.message + ')');
+    throw err;
+  }
+}
+
+// -------------------- init --------------------
+
+function initMap() {
+  // SVG renderer (the Leaflet default) — Canvas's dashArray support is unreliable
+  // on long lines, which made rail/road/ship segments render solid at some zooms.
+  state.map = L.map('map', { zoomControl: true }).setView([50.5, 15.0], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18
+  }).addTo(state.map);
+  state.layer = L.layerGroup().addTo(state.map);
+
+  // The pane is in the flex flow now, so opening/closing it changes the map's
+  // width. Tell Leaflet to recalc tiles when the pane's width transition ends.
+  document.getElementById('letter-pane').addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'width') state.map.invalidateSize();
+  });
+}
+
+document.getElementById('btn-de').addEventListener('click', () => setLang('de'));
+document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
+document.getElementById('scheme-select').addEventListener('change', (e) => setScheme(e.target.value));
+document.getElementById('all-btn').addEventListener('click', () => setChapter('all'));
+document.getElementById('pane-close').addEventListener('click', closeLetterPane);
+document.getElementById('pane-prev').addEventListener('click', () => navigateLocations(-1));
+document.getElementById('pane-next').addEventListener('click', () => navigateLocations(1));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeLetterPane(); return; }
+  if (state.openPaneIndices && (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA')) {
+    if (e.key === 'ArrowLeft')  { navigateLocations(-1); e.preventDefault(); }
+    if (e.key === 'ArrowRight') { navigateLocations(1);  e.preventDefault(); }
+  }
+});
+
+(async function start() {
+  initMap();
+  renderSchemePicker();
+  await loadAllLanguages();
+  renderChapterBar();
+  renderMap({ refit: true });
+})();
+</script>
+</body>
+</html>

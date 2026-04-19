@@ -33,7 +33,6 @@ Eingeschobene Passagen in Klammern sind spätere Anmerkungen Wilhelms (1989), di
 - **Herbert Behr** (Altstoffhändler aus Chemnitz) – enger Freund und ständiger Begleiter; über Frau Behr läuft auch ein Teil der Nachrichten zwischen den Familien.
 - **Hans Findewirth** (Fleischermeister aus Chemnitz) – Begleiter auf Versorgungs- und Munitionsfahrten, als Koch geschätzt.
 - **Alfred Winkler** (Kaufmann aus Berlin) – Gefährte auf Märschen und bei Ausflügen durch die besetzten Länder.
-- **Meinel** – der einzige Kamerad, dessen Tod Wilhelm in den Briefen ausdrücklich betrauert: fällt im Oktober 1942 durch Bombentreffer an der Straße nach Noworossijsk.
 
 **Vorgesetzte**
 - **Hptm. Barthel** – sprunghafter, gefürchteter erster Chef: „Zehnmal wurde etwas befohlen und wieder umgestoßen."

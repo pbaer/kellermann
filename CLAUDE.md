@@ -10,6 +10,16 @@ We're going to keep the primary content source (the `kriegstagebuch-*.txt` files
 
 Note that the marker ">>>>>" in the .txt files indicates the extent of my manual proofreading review. Ignore it.
 
+The marker "#####" indicates a note regarding ambiguous OCR reconstruction or an unknown abbreviation.
+
 Any content we **derive** from the original source material will be in both German and English (stored in /data/de-DE or /data/en-US, respectively). Whenever possible we will preserve Wilhem's editorial voice (including contemporary terminology), but we have more leeway here, especially in the English translation.
 
 Any code, data, schemas, etc. that is independent of the content will all be in English only. And our chat interactions will be primarily in English, but I know German so feel free to use German where appropriate, e.g. when quoting the text.
+
+## Website principles
+
+These guide every change to the interactive website. New principles get added here as they come up.
+
+- **Instant language switch.** Toggling DE/EN is a pure client-side text swap that preserves *all* UI state — map zoom and pan, chapter filter, marker hover/click selection, open detail panes, scroll position. No re-fetch, no re-render of stateful widgets, no flash. Both languages are loaded into the client whenever content data is requested, so the swap can be instant.
+  - We may later add per-element language overrides, but the global switch must remain instant and lossless.
+  - Identifiers that bridge across languages (chapter numbers, chronology global indices, lat/lon coordinates) must stay stable so a UI element rendered in DE can be re-rendered in EN by looking up the matching record by ID.
