@@ -38,7 +38,7 @@ Eingeschobene Passagen in Klammern sind spätere Anmerkungen Wilhelms (1989), di
 **Vorgesetzte**
 - **Hptm. Barthel** – sprunghafter, gefürchteter erster Chef: „Zehnmal wurde etwas befohlen und wieder umgestoßen."
 - **Hptm. Baumann** – Batteriechef ab 1940, nach Barthel als spürbare Erleichterung empfunden; am 20.10.1941 schwer verwundet, stirbt später im Heimatlazarett (Todesnachricht erreicht die Truppe im Januar 1942).
-- **Oblt. Witzel** (Bombengeschädigter aus Essen) – Kompaniechef 1943, dessen Rückkehr aus dem Urlaub in den Briefen als Wendepunkt zu ordentlicher Versorgung und besserem Klima beschrieben wird.
+- **Oblt. Witzel** – Kompaniechef 1943, dessen Rückkehr aus dem Urlaub in den Briefen als Wendepunkt zu ordentlicher Versorgung und besserem Klima beschrieben wird.
 - **Schirrm. Ackermann** (Chemnitz) – zuverlässiger Schirrmeister und Wilhelms Informationsquelle in der Kompanie.
 
 ## Kapitelübersicht
