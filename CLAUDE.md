@@ -1,0 +1,15 @@
+This project contains the letters between my maternal grandparents, Wilhelm and Marianne Kellermann (their daughter Helga, born in 1940, is my mother), during his service in the German army in WWII. See README.md for more information and a summary of the content.
+
+The goal ultimately is to share their story in multiple media formats:
+- An interactive website (in German and English)
+- Printed books (in seaprate German and English editions)
+
+But we're working one step at a time, we're not one-shotting this.
+
+We're going to keep the primary content source (the `kriegstagebuch-*.txt` files) in the original German, and any changes we make to it (e.g. formatting, fixing OCR errors, etc.) MUST preserve the original intent as much as possible (including preserving abbreviations, contemporary place names, etc.). We are not going to apply any editorial voice to Wilhelm's content - technical fixes only!
+
+Note that the marker ">>>>>" in the .txt files indicates the extent of my manual proofreading review. Ignore it.
+
+Any content we **derive** from the original source material will be in both German and English (stored in /data/de-DE or /data/en-US, respectively). Whenever possible we will preserve Wilhem's editorial voice (including contemporary terminology), but we have more leeway here, especially in the English translation.
+
+Any code, data, schemas, etc. that is independent of the content will all be in English only. And our chat interactions will be primarily in English, but I know German so feel free to use German where appropriate, e.g. when quoting the text.
