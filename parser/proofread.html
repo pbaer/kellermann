@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kriegstagebuch Proofreader</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100vh; font-family: Georgia, "Times New Roman", serif; overflow: hidden; color: #2a2520; background: #f4f1ea; }
+  body { display: grid; grid-template-columns: 260px var(--editor-width, 620px) 1fr; grid-template-rows: 100vh; }
+  body.resizing { cursor: col-resize; user-select: none; }
+  body.resizing * { user-select: none !important; }
+
+  button { font-family: inherit; }
+
+  /* Nav */
+  #nav { overflow-y: auto; border-right: 1px solid #d9cfb8; background: #efe7d4; }
+  #nav h1 {
+    margin: 0;
+    padding: 10px 14px;
+    background: #2a2520;
+    color: #f4f1ea;
+    border-bottom: 3px solid #8a6a3a;
+    font-size: 0.95rem;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  #nav h1 .progress { color: #c9a86a; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  #nav .year { border-bottom: 1px solid #d9cfb8; }
+  #nav .year-header {
+    padding: 8px 14px;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a6a3a;
+    cursor: pointer;
+    user-select: none;
+    background: #efe7d4;
+    border-bottom: 1px solid #e0d5bb;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  #nav .year-header:hover { background: #e8dcc3; }
+  #nav .year-header .count { color: #6a5a3a; letter-spacing: 0.04em; }
+  #nav ul { list-style: none; padding: 0; margin: 0; background: #f9f5ec; }
+  #nav li {
+    padding: 5px 14px 5px 18px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    border-left: 3px solid transparent;
+    position: relative;
+    color: #3a322a;
+  }
+  #nav li + li { border-top: 1px solid #efe7d4; }
+  #nav li:hover { background: rgba(201, 168, 106, 0.18); }
+  #nav li.active { background: rgba(201, 168, 106, 0.32); border-left-color: #c9a86a; color: #2a2520; }
+  #nav li.proofread { color: #8a7a5a; }
+  #nav li.proofread::after { content: "✓"; position: absolute; right: 10px; color: #6b7a3a; font-weight: bold; font-size: 0.75rem; }
+  #nav li.next-up { border-left-color: #c9a86a; background: rgba(201, 168, 106, 0.22); color: #2a2520; }
+  #nav li.next-up::after { content: "▶"; position: absolute; right: 10px; color: #8a6a3a; font-size: 0.7rem; }
+  #nav li .badge {
+    display: inline-block;
+    width: 16px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.65rem;
+    border-radius: 2px;
+    padding: 1px 3px;
+    border: 1px solid rgba(0,0,0,0.12);
+    font-family: Georgia, serif;
+  }
+  #nav li.wilhelm .badge { background: #2e5a88; color: #f4f1ea; padding-left: 2px; padding-right: 4px; }
+  #nav li.marianne .badge { background: #8e3b8e; color: #f4f1ea; padding-left: 2px; padding-right: 4px; }
+  #nav li .date { font-variant-numeric: tabular-nums; color: #6a5a3a; white-space: nowrap; font-size: 0.78rem; }
+  #nav li .loc { color: #3a322a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+  /* bbox status: subtle indicators that this letter's scan location is known
+     (solid gold dot), interpolated (hollow ring), or unknown (no dot). */
+  #nav li .bbox-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid transparent;
+  }
+  #nav li.bbox-exact .bbox-dot { background: #c9a86a; border-color: #8a6a3a; }
+  #nav li.bbox-approx .bbox-dot { background: transparent; border-color: #8a6a3a; }
+  #nav li.bbox-none .loc { color: #8a7a5a; }
+  #nav li.bbox-none .date { color: #8a7a5a; }
+
+  /* Editor */
+  #editor-section { display: flex; flex-direction: column; border-right: 1px solid #d9cfb8; min-width: 0; position: relative; background: #fffaf0; }
+  #splitter { position: absolute; top: 0; bottom: 0; right: -3px; width: 6px; cursor: col-resize; z-index: 10; background: transparent; }
+  #splitter:hover, body.resizing #splitter { background: rgba(201, 168, 106, 0.55); }
+
+  #editor-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid #d9cfb8;
+    background: #efe7d4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  #editor-header .title { font-size: 0.88rem; color: #3a322a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  #editor-header .title strong {
+    font-family: "Courier New", Courier, monospace;
+    color: #8a6a3a;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+  }
+  #editor-header .title .proofread-dot { color: #6b7a3a; margin-right: 4px; }
+  #editor-header .controls { display: flex; gap: 6px; align-items: center; }
+  #editor-header .controls button {
+    padding: 3px 12px 4px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid #c9a86a;
+    border-radius: 2px;
+    color: #4a3f32;
+    font-family: inherit;
+  }
+  #editor-header .controls button:hover:not(:disabled) { background: rgba(201, 168, 106, 0.18); color: #2a2520; }
+  #editor-header .controls button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #c9bfa3; }
+  #position { font-size: 0.72rem; letter-spacing: 0.06em; color: #6a5a3a; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; }
+
+  #editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  #editor {
+    flex: 1 1 0;
+    min-height: 120px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: var(--editor-font-size, 14px);
+    padding: 12px 16px;
+    border: none;
+    outline: none;
+    resize: none;
+    line-height: 1.55;
+    tab-size: 4;
+    background: #fffaf0;
+    color: #2a2520;
+  }
+  #editor.bold { font-weight: bold; }
+  body.dirty #editor { background: #fff3d6; }
+  body.dirty #editor-section { box-shadow: inset 3px 0 0 #8a6a3a; }
+
+  #diff-pane {
+    flex: 0 0 auto;
+    max-height: 45vh;
+    min-height: 60px;
+    overflow: auto;
+    border-top: 1px solid #d9cfb8;
+    background: #f9f5ec;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.82rem;
+    padding: 4px 0;
+  }
+  #diff-pane.empty { display: none; }
+  #diff-pane .line { padding: 1px 14px; white-space: pre-wrap; word-break: break-word; }
+  #diff-pane .line.ctx { color: #8a7a5a; }
+  #diff-pane .line.add { background: #e5ead0; color: #3a4a1a; }
+  #diff-pane .line.del { background: #ead7cf; color: #6a1a1a; }
+  #diff-pane .line.add .chg { background: #b9c988; color: #1a2a0a; padding: 0 1px; border-radius: 2px; }
+  #diff-pane .line.del .chg { background: #d6a697; color: #3a0a0a; padding: 0 1px; border-radius: 2px; text-decoration: none; }
+  #diff-pane .hdr {
+    padding: 4px 14px;
+    color: #8a6a3a;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: #efe7d4;
+    border-top: 1px solid #e0d5bb;
+    border-bottom: 1px solid #e0d5bb;
+  }
+
+  #buttons {
+    padding: 10px 14px;
+    border-top: 1px solid #d9cfb8;
+    background: #efe7d4;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #buttons button {
+    padding: 4px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border: 1px solid #c9a86a;
+    background: transparent;
+    border-radius: 2px;
+    color: #4a3f32;
+    letter-spacing: 0.03em;
+    font-family: inherit;
+  }
+  #buttons button:hover:not(:disabled) { background: rgba(201, 168, 106, 0.18); color: #2a2520; }
+  #buttons button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #c9bfa3; }
+  #buttons #btn-commit:not(:disabled) { background: #2a2520; color: #c9a86a; border-color: #2a2520; font-weight: bold; }
+  #buttons #btn-commit:not(:disabled):hover { background: #3a322a; color: #f4f1ea; }
+  #buttons #btn-discard:not(:disabled) { background: transparent; color: #6a1a1a; border-color: #8a4a3a; }
+  #buttons #btn-discard:not(:disabled):hover { background: rgba(138, 74, 58, 0.18); color: #4a0a0a; }
+  #buttons #btn-mark-proofread { margin-left: auto; background: #c9a86a; color: #2a2520; border-color: #8a6a3a; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.72rem; padding: 5px 14px; }
+  #buttons #btn-mark-proofread:hover { background: #d8b878; color: #2a2520; }
+  #buttons #btn-mark-proofread[hidden] { display: none; }
+  #buttons .hint { margin-left: 6px; font-size: 0.7rem; letter-spacing: 0.04em; color: #8a7a5a; font-style: italic; }
+  #buttons #btn-bold { font-family: "Courier New", Courier, monospace; font-weight: bold; width: 30px; padding: 4px 0; }
+  #buttons #btn-bold.active { background: #2a2520; color: #c9a86a; border-color: #2a2520; }
+  #buttons .sep { color: #c9bfa3; padding: 0 2px; }
+  #buttons #font-smaller, #buttons #font-larger { padding: 4px 10px; font-size: 0.78rem; }
+  #buttons #font-readout { font-variant-numeric: tabular-nums; font-size: 0.78rem; color: #6a5a3a; min-width: 1.6em; text-align: center; letter-spacing: 0.04em; }
+
+  /* Image */
+  #image-section { display: flex; flex-direction: column; background: #2a2520; min-width: 0; }
+  #image-wrap { flex: 1; min-height: 0; overflow: auto; padding: 6px; background: #1d1914; }
+  #image-container { position: relative; width: calc(100% * var(--img-zoom, 1.2)); margin: 0 auto; }
+  #page-image { width: 100%; display: block; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+  #bbox-overlay {
+    position: absolute;
+    border: 2px solid #c9a86a;
+    background: rgba(201, 168, 106, 0.15);
+    box-shadow: 0 0 0 3px rgba(201, 168, 106, 0.28), 0 0 12px rgba(201, 168, 106, 0.55);
+    pointer-events: none;
+  }
+  #bbox-overlay.approx {
+    border-style: dashed;
+    background: rgba(201, 168, 106, 0.08);
+    box-shadow: 0 0 0 2px rgba(201, 168, 106, 0.18), 0 0 8px rgba(201, 168, 106, 0.35);
+  }
+  #bbox-overlay[hidden] { display: none; }
+  #page-controls {
+    padding: 8px 14px;
+    background: #2a2520;
+    border-top: 1px solid #4a3f32;
+    color: #c9a86a;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    flex-wrap: wrap;
+  }
+  #page-controls button {
+    padding: 2px 10px;
+    cursor: pointer;
+    background: transparent;
+    color: #f4f1ea;
+    border: 1px solid #4a3f32;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 0.85rem;
+    min-width: 28px;
+  }
+  #page-controls button:hover:not(:disabled) { border-color: #c9a86a; color: #c9a86a; }
+  #page-controls button:disabled { opacity: 0.3; cursor: not-allowed; }
+  #page-info { font-variant-numeric: tabular-nums; color: #e8e2d4; }
+  #zoom-group { display: flex; gap: 6px; align-items: center; margin-left: auto; color: #c9a86a; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  #zoom-readout { font-variant-numeric: tabular-nums; min-width: 3em; text-align: center; color: #e8e2d4; letter-spacing: 0; text-transform: none; }
+</style>
+</head>
+<body>
+  <aside id="nav"><h1>Kriegstagebuch <span class="progress" id="nav-progress"></span></h1></aside>
+
+  <section id="editor-section">
+    <header id="editor-header">
+      <div class="title"><span class="proofread-dot" id="lh-proofread" hidden>✓</span><strong id="lh-id">—</strong> &nbsp; <span id="lh-header">—</span></div>
+      <div class="controls">
+        <span id="position">—</span>
+        <button id="btn-prev" title="Previous letter (Ctrl+←)">‹ Prev</button>
+        <button id="btn-next" title="Next letter (Ctrl+→)">Next ›</button>
+      </div>
+    </header>
+    <div id="editor-wrap">
+      <textarea id="editor" spellcheck="false" wrap="off"></textarea>
+      <div id="diff-pane" class="empty"></div>
+    </div>
+    <div id="buttons">
+      <button id="btn-commit" disabled title="Commit changes (Ctrl+S)">Commit</button>
+      <button id="btn-discard" disabled>Discard</button>
+      <span class="sep">·</span>
+      <button id="btn-bold" title="Bold editor text">B</button>
+      <button id="font-smaller" title="Smaller text">A−</button>
+      <span id="font-readout" title="Editor font size">14</span>
+      <button id="font-larger" title="Larger text">A+</button>
+      <span class="hint">Ctrl+S commit · Ctrl+← / Ctrl+→ prev/next · Ctrl+Shift+M mark</span>
+      <button id="btn-mark-proofread" hidden title="Advance the >>>>> marker past this letter (Ctrl+Shift+M)">Mark as proofread ▶</button>
+    </div>
+    <div id="splitter" title="Drag to resize"></div>
+  </section>
+
+  <aside id="image-section">
+    <div id="image-wrap">
+      <div id="image-container">
+        <img id="page-image" alt="">
+        <div id="bbox-overlay" hidden></div>
+      </div>
+    </div>
+    <div id="page-controls">
+      <button id="page-prev" title="Previous page in range">‹</button>
+      <span id="page-info">—</span>
+      <button id="page-next" title="Next page in range">›</button>
+      <span id="zoom-group">
+        <span>Zoom</span>
+        <button id="zoom-out" title="Zoom out">−</button>
+        <span id="zoom-readout">120%</span>
+        <button id="zoom-in" title="Zoom in">+</button>
+      </span>
+    </div>
+  </aside>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+
+let letters = [];
+let currentIdx = -1;
+let currentLetter = null;
+let originalText = "";
+let pagesForLetter = []; // predicted page(s) for this letter
+let currentPage = 1;     // absolute PDF page number currently on screen
+let pdfPageCount = 167;  // refreshed from the letter API
+
+async function api(url, opts) {
+  const r = await fetch(url, opts || {});
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return r.json();
+}
+
+function isDirty() {
+  return currentLetter && $("editor").value !== originalText;
+}
+
+function updateDirty() {
+  const dirty = isDirty();
+  document.body.classList.toggle("dirty", !!dirty);
+  $("btn-commit").disabled = !dirty;
+  $("btn-discard").disabled = !dirty;
+  $("btn-prev").disabled = !!dirty || currentIdx <= 0;
+  $("btn-next").disabled = !!dirty || currentIdx >= letters.length - 1;
+  // Mark-as-proofread only usable when not dirty and letter qualifies.
+  const mp = $("btn-mark-proofread");
+  const eligible = currentLetter && currentLetter.is_next_to_proofread;
+  mp.hidden = !eligible;
+  mp.disabled = !!dirty;
+}
+
+async function init() {
+  letters = await api("/api/letters");
+  renderNav();
+  const hash = location.hash.slice(1);
+  let idx = 0;
+  if (hash) {
+    const i = letters.findIndex(l => l.id === hash);
+    if (i >= 0) idx = i;
+  } else {
+    // default to the first non-proofread letter
+    const next = letters.findIndex(l => l.is_next_to_proofread);
+    if (next >= 0) idx = next;
+  }
+  await selectLetterByIdx(idx, /*force*/ true);
+}
+
+function renderNav() {
+  const byYear = new Map();
+  letters.forEach((l, i) => {
+    if (!byYear.has(l.year)) byYear.set(l.year, []);
+    byYear.get(l.year).push({ ...l, idx: i });
+  });
+  const nav = $("nav");
+  nav.innerHTML = `<h1>Kriegstagebuch <span class="progress" id="nav-progress"></span></h1>`;
+  const proofreadCount = letters.filter(l => l.proofread).length;
+  $("nav-progress").textContent = `${proofreadCount} / ${letters.length} done`;
+  for (const [year, list] of [...byYear.entries()].sort((a, b) => a[0] - b[0])) {
+    const div = document.createElement("div");
+    div.className = "year";
+    div.innerHTML = `<div class="year-header">${year}<span class="count">${list.length}</span></div><ul></ul>`;
+    const ul = div.querySelector("ul");
+    list.forEach(l => {
+      const li = document.createElement("li");
+      li.dataset.idx = l.idx;
+      const classes = [];
+      if (l.author) classes.push(l.author.toLowerCase());
+      if (l.proofread) classes.push("proofread");
+      if (l.is_next_to_proofread) classes.push("next-up");
+      classes.push("bbox-" + (l.bbox_status || "none"));
+      li.className = classes.join(" ");
+      const dateShort = (l.date_raw || "").replace(/^den\s*/, "");
+      const bboxTitle = l.bbox_status === "exact"
+        ? "Exact bbox on scan"
+        : l.bbox_status === "approx"
+          ? "Approximate bbox (interpolated)"
+          : "No bbox on scan";
+      li.innerHTML =
+        `<span class="badge">${(l.author || "?")[0]}</span>` +
+        `<span class="bbox-dot" title="${bboxTitle}"></span>` +
+        `<span class="date">${dateShort}</span>` +
+        `<span class="loc">${l.location || ""}</span>`;
+      li.title = l.header;
+      li.addEventListener("click", () => selectLetterByIdx(l.idx));
+      ul.appendChild(li);
+    });
+    nav.appendChild(div);
+  }
+  updateNavActive();
+}
+
+function updateNavActive() {
+  document.querySelectorAll("#nav li").forEach(li => {
+    li.classList.toggle("active", Number(li.dataset.idx) === currentIdx);
+  });
+  const active = document.querySelector("#nav li.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+async function selectLetterByIdx(idx, force) {
+  if (!force && isDirty()) {
+    alert("You have unsaved changes. Commit or discard them first.");
+    return;
+  }
+  if (idx < 0 || idx >= letters.length) return;
+  currentIdx = idx;
+  const lid = letters[idx].id;
+  currentLetter = await api(`/api/letter/${lid}`);
+  originalText = currentLetter.raw_text;
+  $("editor").value = originalText;
+
+  if (currentLetter.pdf_page) {
+    pagesForLetter = [currentLetter.pdf_page];
+  } else if (currentLetter.pdf_page_range) {
+    const [a, b] = currentLetter.pdf_page_range;
+    pagesForLetter = [];
+    for (let p = a; p <= b; p++) pagesForLetter.push(p);
+  } else {
+    pagesForLetter = [];
+  }
+  if (currentLetter.pdf_page_count) pdfPageCount = currentLetter.pdf_page_count;
+  currentPage = pagesForLetter[0] || 1;
+  updateImage();
+
+  $("lh-id").textContent = currentLetter.id;
+  $("lh-header").textContent = currentLetter.header;
+  $("lh-proofread").hidden = !currentLetter.proofread;
+  $("position").textContent = `${idx + 1} / ${letters.length}`;
+  location.hash = lid;
+
+  updateDirty();
+  updateDiff();
+  updateNavActive();
+}
+
+function updateImage() {
+  $("page-image").src = `/page/${currentPage}.png`;
+  const predicted = pagesForLetter.length > 0;
+  const inPredicted = predicted && pagesForLetter.includes(currentPage);
+  let info = `PDF page ${currentPage}`;
+  if (predicted) {
+    if (pagesForLetter.length === 1) {
+      if (!inPredicted) info += ` (predicted p${pagesForLetter[0]})`;
+    } else {
+      const [a, b] = [pagesForLetter[0], pagesForLetter[pagesForLetter.length - 1]];
+      if (inPredicted) info += ` · predicted p${a}–p${b}`;
+      else info += ` (outside predicted p${a}–p${b})`;
+    }
+  }
+  $("page-info").textContent = info;
+  $("page-prev").disabled = currentPage <= 1;
+  $("page-next").disabled = currentPage >= pdfPageCount;
+  updateBboxOverlay();
+}
+
+function updateBboxOverlay() {
+  const overlay = $("bbox-overlay");
+  // Only show the bbox on the exact-match page; hide when the user has
+  // flipped to a different page (whether inside the predicted range or past it).
+  const hasBbox = currentLetter && currentLetter.bbox && currentLetter.pdf_page
+                  && currentPage === currentLetter.pdf_page;
+  if (!hasBbox) { overlay.hidden = true; return; }
+  const [x0, y0, x1, y1] = currentLetter.bbox;
+  const [pw, ph] = currentLetter.page_dims;
+  overlay.style.left = `${(x0 / pw) * 100}%`;
+  overlay.style.top = `${(y0 / ph) * 100}%`;
+  overlay.style.width = `${((x1 - x0) / pw) * 100}%`;
+  overlay.style.height = `${((y1 - y0) / ph) * 100}%`;
+  overlay.classList.toggle("approx", !!currentLetter.bbox_approx);
+  overlay.hidden = false;
+}
+
+// ---- diff ----
+function updateDiff() {
+  const diff = $("diff-pane");
+  if (!isDirty()) {
+    diff.classList.add("empty");
+    diff.innerHTML = "";
+    return;
+  }
+  diff.classList.remove("empty");
+  const a = originalText.split("\n");
+  const b = $("editor").value.split("\n");
+  diff.innerHTML = renderUnifiedDiff(a, b);
+}
+
+function lcs(a, b, eq) {
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < m; j++) {
+      dp[i + 1][j + 1] = eq(a[i], b[j]) ? dp[i][j] + 1 : Math.max(dp[i][j + 1], dp[i + 1][j]);
+    }
+  }
+  const ops = [];
+  let i = n, j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && eq(a[i - 1], b[j - 1])) { ops.push(["eq", a[i - 1], b[j - 1]]); i--; j--; }
+    else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) { ops.push(["add", null, b[j - 1]]); j--; }
+    else { ops.push(["del", a[i - 1], null]); i--; }
+  }
+  ops.reverse();
+  return ops;
+}
+
+function tokenize(line) {
+  // Split into words, whitespace runs, and single punctuation chars.
+  return line.match(/\s+|[A-Za-zÄÖÜäöüß]+|\d+|[^\s]/g) || [];
+}
+
+function renderLineWithInline(tokens, keepKinds, chgClass) {
+  // tokens: array of [kind, aVal, bVal] from token-level lcs
+  // keepKinds: set of kinds to render (e.g. ['eq','del'] for a deleted line)
+  const html = [];
+  for (const [kind, aVal, bVal] of tokens) {
+    if (!keepKinds.has(kind)) continue;
+    const text = kind === "add" ? bVal : aVal;
+    if (kind === "eq") {
+      html.push(escHtml(text));
+    } else {
+      html.push(`<span class="${chgClass}">${escHtml(text)}</span>`);
+    }
+  }
+  return html.join("");
+}
+
+function inlineDelAdd(delLine, addLine) {
+  // Return [delHtml, addHtml] with per-token highlights.
+  const aToks = tokenize(delLine);
+  const bToks = tokenize(addLine);
+  const ops = lcs(aToks, bToks, (a, b) => a === b);
+  const delHtml = renderLineWithInline(ops, new Set(["eq", "del"]), "chg");
+  const addHtml = renderLineWithInline(ops, new Set(["eq", "add"]), "chg");
+  return [delHtml, addHtml];
+}
+
+function renderUnifiedDiff(a, b) {
+  // Line-level LCS first, grouped into hunks with 2 lines context.
+  const ops = lcs(a, b, (x, y) => x === y);
+  const CTX = 2;
+  const hunks = [];
+  let k = 0;
+  while (k < ops.length) {
+    while (k < ops.length && ops[k][0] === "eq") k++;
+    if (k >= ops.length) break;
+    const hunkStart = Math.max(0, k - CTX);
+    let end = k;
+    while (end < ops.length) {
+      if (ops[end][0] !== "eq") { end++; continue; }
+      let run = 0;
+      while (end + run < ops.length && ops[end + run][0] === "eq") run++;
+      if (run > CTX * 2) { end += CTX; break; }
+      end += run;
+    }
+    hunks.push([hunkStart, Math.min(ops.length, end)]);
+    k = end;
+  }
+
+  if (!hunks.length) return "";
+  const parts = [];
+  hunks.forEach(([s, e], hIdx) => {
+    if (hIdx > 0) parts.push(`<div class="hdr">…</div>`);
+    let i = s;
+    while (i < e) {
+      const op = ops[i];
+      if (op[0] === "eq") {
+        parts.push(`<div class="line ctx">  ${escHtml(op[1])}</div>`);
+        i++;
+      } else {
+        // Gather runs of del then add; pair them up for inline char diff.
+        const dels = [];
+        while (i < e && ops[i][0] === "del") { dels.push(ops[i][1]); i++; }
+        const adds = [];
+        while (i < e && ops[i][0] === "add") { adds.push(ops[i][2]); i++; }
+        const pairs = Math.min(dels.length, adds.length);
+        for (let p = 0; p < pairs; p++) {
+          const [dH, aH] = inlineDelAdd(dels[p], adds[p]);
+          parts.push(`<div class="line del">- ${dH}</div>`);
+          parts.push(`<div class="line add">+ ${aH}</div>`);
+        }
+        for (let p = pairs; p < dels.length; p++) {
+          parts.push(`<div class="line del">- ${escHtml(dels[p])}</div>`);
+        }
+        for (let p = pairs; p < adds.length; p++) {
+          parts.push(`<div class="line add">+ ${escHtml(adds[p])}</div>`);
+        }
+      }
+    }
+  });
+  return parts.join("");
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+// ---- events ----
+$("editor").addEventListener("input", () => {
+  updateDirty();
+  updateDiff();
+});
+
+$("btn-commit").addEventListener("click", async () => {
+  const r = await fetch(`/api/letter/${currentLetter.id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: $("editor").value }),
+  });
+  if (!r.ok) { alert("Save failed"); return; }
+  const data = await r.json();
+  originalText = $("editor").value;
+  letters = data.letters;
+  // Keep currentLetter in sync regarding proofread status
+  const updated = letters[currentIdx];
+  currentLetter.proofread = updated.proofread;
+  currentLetter.is_next_to_proofread = updated.is_next_to_proofread;
+  renderNav();
+  updateDirty();
+  updateDiff();
+  $("lh-proofread").hidden = !currentLetter.proofread;
+});
+
+$("btn-discard").addEventListener("click", () => {
+  $("editor").value = originalText;
+  updateDirty();
+  updateDiff();
+});
+
+$("btn-mark-proofread").addEventListener("click", async () => {
+  if (isDirty()) { alert("Commit or discard first."); return; }
+  const r = await fetch(`/api/mark-proofread/${currentLetter.id}`, { method: "POST" });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    alert("Mark failed: " + (err.error || r.status));
+    return;
+  }
+  const data = await r.json();
+  letters = data.letters;
+  renderNav();
+  // Advance to the next letter automatically (just proofread this one).
+  const nextIdx = currentIdx + 1;
+  if (nextIdx < letters.length) {
+    await selectLetterByIdx(nextIdx, /*force*/ true);
+  } else {
+    // Refresh view of the current letter so its badges update.
+    await selectLetterByIdx(currentIdx, /*force*/ true);
+  }
+});
+
+$("btn-prev").addEventListener("click", () => selectLetterByIdx(currentIdx - 1));
+$("btn-next").addEventListener("click", () => selectLetterByIdx(currentIdx + 1));
+$("page-prev").addEventListener("click", () => {
+  if (currentPage > 1) { currentPage--; updateImage(); }
+});
+$("page-next").addEventListener("click", () => {
+  if (currentPage < pdfPageCount) { currentPage++; updateImage(); }
+});
+
+$("page-image").addEventListener("load", () => {
+  updateBboxOverlay();
+  // Center the scroll position on the newly-loaded page so the initial
+  // view isn't stuck against the top-left corner when zoom > 100%.
+  centerScroll();
+});
+
+// Zoom — persisted in localStorage, applied via CSS custom property.
+// On change, preserve the viewport center so the image appears to zoom
+// around the center point rather than the top-left corner.
+const ZOOM_KEY = "kriegstagebuch.zoom";
+const ZOOM_MIN = 80, ZOOM_MAX = 250, ZOOM_STEP = 10;
+let currentZoom = 1.2;
+function centerScroll() {
+  const wrap = $("image-wrap");
+  wrap.scrollLeft = Math.max(0, (wrap.scrollWidth - wrap.clientWidth) / 2);
+  wrap.scrollTop = Math.max(0, (wrap.scrollHeight - wrap.clientHeight) / 2);
+}
+function applyZoom(pct, { preserveCenter = true } = {}) {
+  const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(Number(pct) || 120)));
+  const newZoom = clamped / 100;
+  const k = newZoom / currentZoom;
+  const wrap = $("image-wrap");
+  let cx = 0, cy = 0;
+  if (preserveCenter) {
+    cx = wrap.scrollLeft + wrap.clientWidth / 2;
+    cy = wrap.scrollTop + wrap.clientHeight / 2;
+  }
+  currentZoom = newZoom;
+  document.documentElement.style.setProperty("--img-zoom", String(newZoom));
+  $("zoom-readout").textContent = `${clamped}%`;
+  localStorage.setItem(ZOOM_KEY, String(clamped));
+  $("zoom-out").disabled = clamped <= ZOOM_MIN;
+  $("zoom-in").disabled = clamped >= ZOOM_MAX;
+  if (preserveCenter) {
+    wrap.scrollLeft = cx * k - wrap.clientWidth / 2;
+    wrap.scrollTop = cy * k - wrap.clientHeight / 2;
+  }
+}
+applyZoom(Number(localStorage.getItem(ZOOM_KEY)) || 120, { preserveCenter: false });
+$("zoom-out").addEventListener("click", () => applyZoom(Math.round(currentZoom * 100) - ZOOM_STEP));
+$("zoom-in").addEventListener("click", () => applyZoom(Math.round(currentZoom * 100) + ZOOM_STEP));
+
+// Bold toggle for the editor text — persisted.
+const BOLD_KEY = "kriegstagebuch.bold";
+function applyBold(on) {
+  $("editor").classList.toggle("bold", on);
+  $("btn-bold").classList.toggle("active", on);
+  localStorage.setItem(BOLD_KEY, on ? "1" : "0");
+}
+applyBold(localStorage.getItem(BOLD_KEY) !== "0");
+$("btn-bold").addEventListener("click", () => applyBold(!$("editor").classList.contains("bold")));
+
+// Editor font size — persisted. ±1px steps, clamped.
+const FONT_KEY = "kriegstagebuch.fontSize";
+const FONT_MIN = 10, FONT_MAX = 22;
+function applyFont(px) {
+  const clamped = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(px) || 13)));
+  document.documentElement.style.setProperty("--editor-font-size", `${clamped}px`);
+  $("font-readout").textContent = String(clamped);
+  localStorage.setItem(FONT_KEY, String(clamped));
+  $("font-smaller").disabled = clamped <= FONT_MIN;
+  $("font-larger").disabled = clamped >= FONT_MAX;
+}
+applyFont(Number(localStorage.getItem(FONT_KEY)) || 14);
+$("font-smaller").addEventListener("click", () => applyFont(parseInt($("font-readout").textContent, 10) - 1));
+$("font-larger").addEventListener("click", () => applyFont(parseInt($("font-readout").textContent, 10) + 1));
+
+// Splitter — drag to resize the editor pane. Width persisted per-browser.
+const SPLITTER_KEY = "kriegstagebuch.editorWidth";
+const NAV_WIDTH = 260;
+function applyEditorWidth(px) {
+  const minW = 360;
+  const maxW = Math.max(minW, window.innerWidth - NAV_WIDTH - 360);
+  const clamped = Math.max(minW, Math.min(maxW, Math.round(px)));
+  document.documentElement.style.setProperty("--editor-width", `${clamped}px`);
+  localStorage.setItem(SPLITTER_KEY, String(clamped));
+}
+applyEditorWidth(Number(localStorage.getItem(SPLITTER_KEY)) || 620);
+
+let dragging = false;
+$("splitter").addEventListener("mousedown", e => {
+  dragging = true;
+  document.body.classList.add("resizing");
+  e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  applyEditorWidth(e.clientX - NAV_WIDTH);
+});
+window.addEventListener("mouseup", () => {
+  if (dragging) {
+    dragging = false;
+    document.body.classList.remove("resizing");
+  }
+});
+window.addEventListener("resize", () => {
+  // Re-clamp in case the window shrank below the old editor width.
+  applyEditorWidth(Number(localStorage.getItem(SPLITTER_KEY)) || 620);
+});
+
+document.addEventListener("keydown", e => {
+  const isMod = e.ctrlKey || e.metaKey;
+  if (isMod && e.key === "s") {
+    e.preventDefault();
+    if (isDirty()) $("btn-commit").click();
+  } else if (isMod && e.key === "ArrowLeft") {
+    e.preventDefault();
+    if (!isDirty()) selectLetterByIdx(currentIdx - 1);
+    else alert("Commit or discard first.");
+  } else if (isMod && e.key === "ArrowRight") {
+    e.preventDefault();
+    if (!isDirty()) selectLetterByIdx(currentIdx + 1);
+    else alert("Commit or discard first.");
+  } else if (isMod && e.shiftKey && (e.key === "M" || e.key === "m")) {
+    e.preventDefault();
+    const btn = $("btn-mark-proofread");
+    if (!btn.hidden && !btn.disabled) btn.click();
+  }
+});
+
+window.addEventListener("beforeunload", e => {
+  if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
+});
+
+init();
+})();
+</script>
+</body>
+</html>
