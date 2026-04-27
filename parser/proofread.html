@@ -271,8 +271,8 @@
       <div class="title"><span class="proofread-dot" id="lh-proofread" hidden>✓</span><strong id="lh-id">—</strong> &nbsp; <span id="lh-header">—</span></div>
       <div class="controls">
         <span id="position">—</span>
-        <button id="btn-prev" title="Previous letter (Ctrl+←)">‹ Prev</button>
-        <button id="btn-next" title="Next letter (Ctrl+→)">Next ›</button>
+        <button id="btn-prev" title="Previous letter (Ctrl+Shift+←)">‹ Prev</button>
+        <button id="btn-next" title="Next letter (Ctrl+Shift+→)">Next ›</button>
       </div>
     </header>
     <div id="editor-wrap">
@@ -287,7 +287,7 @@
       <button id="font-smaller" title="Smaller text">A−</button>
       <span id="font-readout" title="Editor font size">14</span>
       <button id="font-larger" title="Larger text">A+</button>
-      <span class="hint">Ctrl+S commit · Ctrl+← / Ctrl+→ prev/next · Ctrl+Shift+M mark</span>
+      <span class="hint">Ctrl+S commit · Ctrl+Shift+← / Ctrl+Shift+→ prev/next · Ctrl+Shift+M mark</span>
       <button id="btn-mark-proofread" hidden title="Advance the >>>>> marker past this letter (Ctrl+Shift+M)">Mark as proofread ▶</button>
     </div>
     <div id="splitter" title="Drag to resize"></div>
@@ -782,11 +782,11 @@ document.addEventListener("keydown", e => {
   if (isMod && e.key === "s") {
     e.preventDefault();
     if (isDirty()) $("btn-commit").click();
-  } else if (isMod && e.key === "ArrowLeft") {
+  } else if (isMod && e.shiftKey && e.key === "ArrowLeft") {
     e.preventDefault();
     if (!isDirty()) selectLetterByIdx(currentIdx - 1);
     else alert("Commit or discard first.");
-  } else if (isMod && e.key === "ArrowRight") {
+  } else if (isMod && e.shiftKey && e.key === "ArrowRight") {
     e.preventDefault();
     if (!isDirty()) selectLetterByIdx(currentIdx + 1);
     else alert("Commit or discard first.");
