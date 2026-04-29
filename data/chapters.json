@@ -1,0 +1,79 @@
+[
+  {
+    "number": 1,
+    "title": {
+      "de-DE": "Einberufung und Sitzkrieg",
+      "en-US": "Conscription and the Phoney War"
+    },
+    "date_range": {
+      "de-DE": "Juli 1939 – Mai 1940",
+      "en-US": "July 1939 – May 1940"
+    }
+  },
+  {
+    "number": 2,
+    "title": {
+      "de-DE": "Westfeldzug und Besatzungszeit in Frankreich",
+      "en-US": "Western Campaign and Occupation of France"
+    },
+    "date_range": {
+      "de-DE": "Mai 1940 – Januar 1941",
+      "en-US": "May 1940 – January 1941"
+    }
+  },
+  {
+    "number": 3,
+    "title": {
+      "de-DE": "Rumänien, Bulgarien und Balkanfeldzug",
+      "en-US": "Romania, Bulgaria and the Balkans Campaign"
+    },
+    "date_range": {
+      "de-DE": "Januar – Juni 1941",
+      "en-US": "January – June 1941"
+    }
+  },
+  {
+    "number": 4,
+    "title": {
+      "de-DE": "Ostfeldzug: Vormarsch durch Ukraine und Kaukasus",
+      "en-US": "Eastern Campaign: Advance through Ukraine and the Caucasus"
+    },
+    "date_range": {
+      "de-DE": "Juni 1941 – Februar 1943",
+      "en-US": "June 1941 – February 1943"
+    }
+  },
+  {
+    "number": 5,
+    "title": {
+      "de-DE": "Rückzug, Verwundung und Genesung",
+      "en-US": "Retreat, Wound and Recovery"
+    },
+    "date_range": {
+      "de-DE": "Februar – Oktober 1943",
+      "en-US": "February – October 1943"
+    }
+  },
+  {
+    "number": 6,
+    "title": {
+      "de-DE": "Bei der V-2-Raketentruppe – Pommern und Westen",
+      "en-US": "With the V-2 Rocket Troop – Pomerania and the West"
+    },
+    "date_range": {
+      "de-DE": "Oktober 1943 – März 1945",
+      "en-US": "October 1943 – March 1945"
+    }
+  },
+  {
+    "number": 7,
+    "title": {
+      "de-DE": "Rückzug, Gefangenschaft und Heimkehr",
+      "en-US": "Retreat, Captivity and Homecoming"
+    },
+    "date_range": {
+      "de-DE": "März – Mai 1945",
+      "en-US": "March – May 1945"
+    }
+  }
+]

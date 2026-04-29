@@ -15,5 +15,9 @@ echo "▶ map_pdf.py"
 "$PY" map_pdf.py
 
 echo
+echo "▶ build_chapter_letters.py"
+"$PY" build_chapter_letters.py
+
+echo
 echo "▶ proofread.py"
 exec "$PY" proofread.py

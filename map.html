@@ -227,6 +227,7 @@
   }
   .kb-tooltip .kb-desc {
     font-size: 0.82rem;
+    font-style: italic;
     color: #e8e2d4;
   }
   .kb-tooltip .kb-entry + .kb-entry {
@@ -363,6 +364,7 @@
 
   .entry-desc {
     font-size: 0.9rem;
+    font-style: italic;
     line-height: 1.55;
     color: #3a322a;
   }
@@ -404,6 +406,11 @@
     margin-bottom: 12px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
   }
+  .letter.from-marianne {
+    background: #f6f2fa;
+    border-color: #d8d0e2;
+    border-left-color: #8a6ea8;
+  }
   .letter:last-child { margin-bottom: 0; }
   .letter .letter-meta {
     display: flex;
@@ -416,12 +423,9 @@
     color: #8a6a3a;
     margin-bottom: 8px;
   }
+  .letter.from-marianne .letter-meta { color: #6a5a8a; }
   .letter .letter-meta .from { font-weight: bold; color: #6a5a3a; }
-  .letter .letter-greeting {
-    font-style: italic;
-    margin-bottom: 8px;
-    color: #3a322a;
-  }
+  .letter.from-marianne .letter-meta .from { color: #4a3a6a; }
   .letter .letter-body {
     font-size: 0.88rem;
     line-height: 1.55;
@@ -429,13 +433,12 @@
   }
   .letter .letter-body p { margin: 0 0 8px 0; }
   .letter .letter-body p:last-child { margin-bottom: 0; }
-  .letter .letter-signoff {
-    margin-top: 10px;
+  .letter .letter-body p.ocr-note {
+    color: #8a7a5a;
     font-style: italic;
-    color: #6a5a3a;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
   }
-  .placeholder-note {
+  .translation-banner {
     background: #fff3d6;
     border: 1px dashed #c9a86a;
     color: #6a5a3a;
@@ -444,6 +447,31 @@
     line-height: 1.4;
     border-radius: 2px;
     margin-bottom: 12px;
+  }
+  .no-letters {
+    color: #8a7a5a;
+    font-style: italic;
+    font-size: 0.85rem;
+    padding: 8px 0;
+  }
+  .derived-from {
+    font-size: 0.82rem;
+    color: #5a4a32;
+    padding: 6px 0 8px;
+    line-height: 1.5;
+  }
+  .derived-from .derived-label {
+    color: #7a6a4a;
+    margin-right: 4px;
+  }
+  .derived-from .source-letter-link {
+    color: #7a3a1a;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    cursor: pointer;
+  }
+  .derived-from .source-letter-link:hover {
+    color: #b04a1a;
   }
 
   .kb-marker {
@@ -552,8 +580,7 @@ const COLOR_SCHEMES = {
   era: {
     name: { de: "Epoche (Standard)", en: "Era (current)" },
     // Cool blues → summer golds/oranges → deep wine red. Tracks the war's mood arc.
-    // Ch 8 is teal (not steel blue) so it's clearly distinct from Ch 1's deep blue —
-    // both phases play out in northern Germany so they share map space.
+    // Trailing colors past 7 are unused (kept for future re-segmentation).
     colors: ['#2e5a88','#3a8a5c','#6a8a3a','#c4a04a','#d97a3a',
              '#8a4a2a','#c97a8a','#2a807a','#7a3a6a','#6a1a1a']
   },
@@ -602,37 +629,14 @@ const STRINGS = {
     otherVisits: "Weitere Besuche hier",
     visitsHeading: "Stationen an diesem Ort",
     lettersHeading: "Briefe",
-    placeholderNote: "Platzhalter — die strukturierten Brieftexte werden später ergänzt.",
     fromWilhelm: "von Wilhelm",
     fromMarianne: "von Marianne",
     placeGloesa: "Chemnitz-Glösa",
     enRoute: "unterwegs",
-    letters: [
-      {
-        greeting: "Liebe Marianne!",
-        body: [
-          "Heute hatten wir endlich Quartier in einem festen Haus. Die Fahrt war lang, der Staub fürchterlich, doch der Spies hat uns Kaffee und Brot besorgt. Hier wird später der eigentliche Brieftext aus Wilhelms Feldpost stehen — derzeit nur ein Platzhalter zur Veranschaulichung des Layouts.",
-          "Schreibe mir bitte, sobald Du dieses Schreiben erhalten hast. Über jede Zeile von zu Hause freut man sich hier draußen ganz besonders."
-        ],
-        signoff: "Dein Wilhelm"
-      },
-      {
-        greeting: "Mein lieber Wilhelm,",
-        body: [
-          "Helga hat heute zum ersten Mal beim Laufen nicht mehr gestürzt. Wir waren am Nachmittag bei Frau Behr; sie hat von Herbert seit drei Wochen keine Post. Hier kommt später Mariannes Original-Briefinhalt aus Glösa.",
-          "Vati liegt mit Fieber im Bett, aber der Doktor sagt, es sei nichts Schlimmes. Ich nummeriere meine Briefe weiter — dies ist Nr. 47."
-        ],
-        signoff: "In Liebe, Deine Marianne"
-      },
-      {
-        greeting: "Liebe Marianne!",
-        body: [
-          "Deinen Brief Nr. 45 habe ich gestern erhalten — vielen Dank! Daß Helga jetzt allein laufen kann, kann ich mir kaum vorstellen. Auer und ich teilen uns wieder eine Stube. Platzhaltertext, der später durch das tatsächliche Brieftranskript ersetzt wird.",
-          "Bitte grüße Deine Eltern und küsse Helga von ihrem Vati."
-        ],
-        signoff: "Dein Wilhelm"
-      }
-    ]
+    noLettersInWindow: "(Keine erhaltenen Briefe aus diesem Abschnitt.)",
+    derivedFromOne: "Aus folgendem Brief abgeleitet:",
+    derivedFromMany: "Aus folgenden Briefen abgeleitet:",
+    translationPending: ""
   },
   en: {
     title: "Wilhelm Kellermann",
@@ -651,41 +655,32 @@ const STRINGS = {
     otherVisits: "Other visits here",
     visitsHeading: "Visits to this location",
     lettersHeading: "Letters",
-    placeholderNote: "Placeholder — the structured letter transcripts will be added later.",
     fromWilhelm: "from Wilhelm",
     fromMarianne: "from Marianne",
     placeGloesa: "Chemnitz-Glösa",
     enRoute: "en route",
-    letters: [
-      {
-        greeting: "Dearest Marianne,",
-        body: [
-          "Today we finally got quarters in a proper house. The drive was long and the dust dreadful, but the Spieß rounded up coffee and bread for us. Wilhelm's actual field-post letter text will appear here once the transcripts are structured — for now this is just placeholder copy to demonstrate the layout.",
-          "Please write back as soon as you receive this. Every line from home means more out here than I can say."
-        ],
-        signoff: "Your Wilhelm"
-      },
-      {
-        greeting: "My dear Wilhelm,",
-        body: [
-          "Helga managed her first walk today without falling. We visited Frau Behr in the afternoon; she has had no post from Herbert for three weeks. Marianne's original letter text from Glösa will sit here in the final version.",
-          "Father is in bed with a fever, but the doctor says it is nothing serious. I am still numbering my letters — this is no. 47."
-        ],
-        signoff: "With love, your Marianne"
-      },
-      {
-        greeting: "Dearest Marianne,",
-        body: [
-          "Your letter no. 45 arrived yesterday — thank you so much! It is hard to picture Helga walking on her own already. Auer and I are sharing a room again. This is placeholder text, to be replaced by the actual letter transcript later.",
-          "Please give my love to your parents and a kiss to Helga from her Vati."
-        ],
-        signoff: "Your Wilhelm"
-      }
-    ]
+    noLettersInWindow: "(No surviving letters from this segment.)",
+    derivedFromOne: "Derived from the following letter:",
+    derivedFromMany: "Derived from the following letters:",
+    translationPending: "Letter content not yet translated — shown in original German."
   }
 };
 
-const LOCALE_DIR = { de: 'de-DE', en: 'en-US' };
+// Map UI lang code ('de'/'en') to the locale keys used inside data files.
+const LOCALE_CODES = { de: 'de-DE', en: 'en-US' };
+
+// Resolve a localizable field. Returns the requested locale's text if present,
+// otherwise the first available locale (so a missing translation degrades to
+// the source rather than rendering empty). Returns plain strings unchanged so
+// the helper is safe on un-wrapped legacy fields.
+function loc(field, lang) {
+  if (field == null) return '';
+  if (typeof field === 'string') return field;
+  const code = LOCALE_CODES[lang] || lang;
+  if (field[code]) return field[code];
+  for (const v of Object.values(field)) if (v) return v;
+  return '';
+}
 
 // -------------------- state --------------------
 
@@ -693,7 +688,7 @@ const state = {
   lang: 'de',
   chapter: 'all',     // 'all' or 1..10
   scheme: 'era',      // key into COLOR_SCHEMES
-  data: { de: null, en: null }, // { manifest, chapters: [{...meta, entries: []}] }
+  data: null,         // { manifest, chapters: [{...meta, entries: [], letters: []}], letterOwner }
   map: null,
   layer: null,
   openPaneIndex: null,           // global index of the one entry shown in the side pane
@@ -701,7 +696,9 @@ const state = {
                                  //   multi-visit place currently displays on the map.
                                  //   Cleared on chapter change; otherwise sticky.
   markersByKey: new Map(),       // 'lat,lon' -> { marker, inner } for halo + updates
-  activeMarkerKey: null          // key of currently haloed marker, if any
+  activeMarkerKey: null,         // key of currently haloed marker, if any
+  _suppressHashChange: false     // set when we update the hash ourselves so the
+                                 //   hashchange listener doesn't re-fire the open
 };
 
 // -------------------- helpers --------------------
@@ -726,40 +723,70 @@ function chapterColor(num) {
 
 // -------------------- data loading --------------------
 
-async function loadLang(lang) {
-  if (state.data[lang]) return state.data[lang];
-  const dir = LOCALE_DIR[lang];
-  const manifest = await fetch(`data/${dir}/chapters.json`).then(r => {
+async function loadData() {
+  if (state.data) return state.data;
+  const manifest = await fetch('data/chapters.json').then(r => {
     if (!r.ok) throw new Error(`chapters.json HTTP ${r.status}`);
     return r.json();
   });
   const chapters = await Promise.all(manifest.map(async (m) => {
-    const url = `data/${dir}/chapter-${String(m.number).padStart(2, '0')}/chronology.jsonl`;
-    const text = await fetch(url).then(r => {
-      if (!r.ok) throw new Error(`${url} HTTP ${r.status}`);
-      return r.text();
-    });
-    const entries = text.split('\n')
+    const ch = String(m.number).padStart(2, '0');
+    const chronoUrl = `data/chapter-${ch}/chronology.jsonl`;
+    const lettersUrl = `data/chapter-${ch}/letters.jsonl`;
+    const [chronoText, lettersText] = await Promise.all([
+      fetch(chronoUrl).then(r => {
+        if (!r.ok) throw new Error(`${chronoUrl} HTTP ${r.status}`);
+        return r.text();
+      }),
+      fetch(lettersUrl).then(r => {
+        if (!r.ok) throw new Error(`${lettersUrl} HTTP ${r.status}`);
+        return r.text();
+      })
+    ]);
+    const entries = chronoText.split('\n')
       .filter(l => l.trim().length > 0)
       .map(l => JSON.parse(l));
-    return { ...m, entries };
+    const letters = lettersText.split('\n')
+      .filter(l => l.trim().length > 0)
+      .map(l => JSON.parse(l));
+    return { ...m, entries, letters };
   }));
-  // Annotate each entry with its chapter number and a global chronological index.
+  // Annotate each entry with its chapter number and a global chronological index,
+  // then attach letters to the chronology entry whose date window contains them.
   let globalIdx = 0;
   for (const ch of chapters) {
     for (const e of ch.entries) {
       e._chapter = ch.number;
       e._globalIdx = globalIdx++;
+      e._letters = [];
+    }
+    if (ch.entries.length === 0) continue;
+    for (const letter of ch.letters) {
+      const iso = letter.date_iso || ch.entries[0].arrival_date;
+      let target = ch.entries[0];
+      for (const entry of ch.entries) {
+        if (entry.arrival_date <= iso) target = entry;
+        else break;
+      }
+      target._letters.push(letter);
     }
   }
-  state.data[lang] = { manifest, chapters, totalEntries: globalIdx };
-  return state.data[lang];
+  // letter id -> owning chronology entry. Used by source_letters links so that
+  // clicking jumps to the entry whose pane currently displays that letter.
+  const letterOwner = new Map();
+  for (const ch of chapters) {
+    for (const e of ch.entries) {
+      for (const L of e._letters) letterOwner.set(L.id, e);
+    }
+  }
+  state.data = { manifest, chapters, totalEntries: globalIdx, letterOwner };
+  return state.data;
 }
 
 // -------------------- rendering --------------------
 
 function activeEntries() {
-  const d = state.data[state.lang];
+  const d = state.data;
   if (!d) return [];
   if (state.chapter === 'all') {
     return d.chapters.flatMap(c => c.entries);
@@ -768,8 +795,8 @@ function activeEntries() {
   return ch ? ch.entries : [];
 }
 
-function entryByGlobalIdx(lang, idx) {
-  const d = state.data[lang];
+function entryByGlobalIdx(idx) {
+  const d = state.data;
   if (!d) return null;
   for (const ch of d.chapters) {
     for (const e of ch.entries) {
@@ -848,11 +875,13 @@ function renderMap({ refit = false } = {}) {
     // summary, not tied to the pane's currently-open entry.
     const tooltipHtml = group.map(e => {
       const modeLabel = e.arrival_mode ? ' · ' + s.arrivalMode[e.arrival_mode] : '';
+      const descText = loc(e.description, lang);
+      const descHtml = descText ? `<div class="kb-desc">${escapeHtml(descText)}</div>` : '';
       return `
       <div class="kb-entry">
         <div class="kb-date">#${e._globalIdx + 1} · ${formatDate(e.arrival_date, lang)}${e.radius_km ? ' · ' + s.approxArea : ''}${modeLabel}</div>
-        <div class="kb-place">${escapeHtml(e.place)}</div>
-        <div class="kb-desc">${escapeHtml(e.description)}</div>
+        <div class="kb-place">${escapeHtml(loc(e.place, lang))}</div>
+        ${descHtml}
       </div>
       `;
     }).join('');
@@ -882,7 +911,7 @@ function renderMap({ refit = false } = {}) {
   // set (e.g. after chapter filter / scheme / language re-render).
   state.activeMarkerKey = null;
   if (state.openPaneIndex !== null) {
-    const e = entryByGlobalIdx(state.lang, state.openPaneIndex);
+    const e = entryByGlobalIdx(state.openPaneIndex);
     if (e) setActiveMarker(`${e.lat},${e.lon}`);
   }
 
@@ -935,8 +964,9 @@ function pct(ms, startMs, endMs) {
 // ---- Header / timeline render ----
 
 function renderChapterBar() {
-  const d = state.data[state.lang];
+  const d = state.data;
   const s = STRINGS[state.lang];
+  const lang = state.lang;
 
   const allBtn = document.getElementById('all-btn');
   allBtn.textContent = s.allChapters;
@@ -962,12 +992,14 @@ function renderChapterBar() {
     btn.type = 'button';
     btn.className = 'chapter-btn' + (state.chapter === r.number ? ' active' : '');
     btn.dataset.chapter = String(r.number);
-    btn.title = `${m.title} (${m.date_range})`;
+    const title = loc(m.title, lang);
+    const dateRange = loc(m.date_range, lang);
+    btn.title = `${title} (${dateRange})`;
     btn.style.left = `${left}%`;
     btn.style.width = `${width}%`;
     btn.style.setProperty('--ch-color', color);
     btn.style.background = color;
-    btn.innerHTML = `<span class="num">${r.number}.</span><span class="title">${escapeHtml(m.title)}</span>`;
+    btn.innerHTML = `<span class="num">${r.number}.</span><span class="title">${escapeHtml(title)}</span>`;
     btn.addEventListener('click', () => selectChapter(r.number));
     track.appendChild(btn);
   }
@@ -982,12 +1014,6 @@ function renderChapterBar() {
 }
 
 // -------------------- letter pane --------------------
-
-function addDays(iso, days) {
-  const d = new Date(iso + 'T00:00:00Z');
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 // Returns the entry whose number/color a place's marker should display, given
 // the group of entries at that place (already filtered to the active chapter).
@@ -1006,7 +1032,35 @@ function entriesAtSamePlace(entry) {
   return activeEntries().filter(e => e.lat === entry.lat && e.lon === entry.lon);
 }
 
-function openLetterPaneByEntry(entry, { skipRender = false } = {}) {
+// URL hash <-> open-pane entry. Hash is `#loc-N` where N is the 1-based global
+// chronology index (matching the marker label users see). Stable across
+// language switches and refactors that preserve the chronology order.
+function hashForEntry(entry) {
+  return entry ? `#loc-${entry._globalIdx + 1}` : '';
+}
+
+function entryFromHash() {
+  const m = (location.hash || '').match(/^#loc-(\d+)$/);
+  if (!m) return null;
+  return entryByGlobalIdx(parseInt(m[1], 10) - 1);
+}
+
+// Update the URL hash, suppressing the hashchange listener's reaction so we
+// don't double-handle our own writes.
+function syncHash(entry) {
+  const target = hashForEntry(entry);
+  const current = location.hash || '';
+  if (target === current) return;
+  state._suppressHashChange = true;
+  if (target) {
+    history.pushState(null, '', target);
+  } else {
+    // Strip the hash without leaving a stray "#" in the URL bar.
+    history.pushState(null, '', location.pathname + location.search);
+  }
+}
+
+function openLetterPaneByEntry(entry, { skipRender = false, pushHistory = true } = {}) {
   if (!entry) return;
   const wasOpen = state.openPaneIndex !== null;
   const prevScroll = wasOpen ? document.getElementById('pane-body').scrollTop : 0;
@@ -1035,6 +1089,8 @@ function openLetterPaneByEntry(entry, { skipRender = false } = {}) {
   pane.setAttribute('aria-hidden', 'false');
   // Preserve scroll position on language-swap re-renders; reset on fresh opens.
   pane.querySelector('.pane-body').scrollTop = wasOpen ? prevScroll : 0;
+
+  if (pushHistory) syncHash(entry);
 }
 
 // Marks one marker as the "current selection" with a colored halo + brings it
@@ -1075,7 +1131,7 @@ function navigateEntries(direction) {
   }
   // Boundary — cross into adjacent chapter (All view has nowhere to cross).
   if (state.chapter === 'all') return;
-  const total = state.data[state.lang].chapters.length;
+  const total = state.data.chapters.length;
   const next = state.chapter + direction;
   if (next < 1 || next > total) return;
   setChapter(next);                       // refits map to new chapter's bounds
@@ -1110,7 +1166,7 @@ function renderPaneNav() {
   }
   // In a chapter-filtered view, edges remain enabled if there's a neighbor
   // chapter to cross into.
-  const total = state.data[state.lang].chapters.length;
+  const total = state.data.chapters.length;
   const canCrossPrev = state.chapter !== 'all' && state.chapter > 1;
   const canCrossNext = state.chapter !== 'all' && state.chapter < total;
   prev.disabled = i === 0 && !canCrossPrev;
@@ -1122,8 +1178,8 @@ function renderLetterPane(entry) {
   const lang = state.lang;
   const s = STRINGS[lang];
 
-  const m = state.data[lang].manifest.find(x => x.number === entry._chapter);
-  const chTitle = m ? `${entry._chapter}. ${m.title}` : `${entry._chapter}.`;
+  const m = state.data.manifest.find(x => x.number === entry._chapter);
+  const chTitle = m ? `${entry._chapter}. ${loc(m.title, lang)}` : `${entry._chapter}.`;
   const chColor = chapterColor(entry._chapter);
 
   const metaBits = [
@@ -1138,7 +1194,7 @@ function renderLetterPane(entry) {
       <span class="swatch" style="background:${chColor}"></span>
       <span>${escapeHtml(chTitle)}</span>
     </div>
-    <h2>${escapeHtml(entry.place)}</h2>
+    <h2>${escapeHtml(loc(entry.place, lang))}</h2>
     <div class="pane-date-range">${escapeHtml(metaBits.join(' · '))}</div>
   `;
 
@@ -1152,35 +1208,53 @@ function renderLetterPane(entry) {
        </div>`
     : '';
 
-  // Placeholder letters anchored around this entry's date.
-  const dayOffsets = [-2, 0, 5];
-  const senders = ['wilhelm', 'marianne', 'wilhelm'];
-  const lettersHtml = s.letters.map((tpl, i) => {
-    const sender = senders[i];
-    const senderLabel = sender === 'wilhelm' ? s.fromWilhelm : s.fromMarianne;
-    const fromPlace = sender === 'wilhelm' ? entry.place : s.placeGloesa;
-    const date = formatDate(addDays(entry.arrival_date, dayOffsets[i]), lang);
-    return `
-      <article class="letter">
-        <div class="letter-meta">
-          <span class="from">${escapeHtml(senderLabel)} · ${escapeHtml(fromPlace)}</span>
-          <span class="date">${escapeHtml(date)}</span>
-        </div>
-        <div class="letter-greeting">${escapeHtml(tpl.greeting)}</div>
-        <div class="letter-body">${tpl.body.map(p => `<p>${escapeHtml(p)}</p>`).join('')}</div>
-        <div class="letter-signoff">${escapeHtml(tpl.signoff)}</div>
-      </article>
-    `;
-  }).join('');
+  // Real letters from the parser output, bucketed into this entry's date window.
+  const letters = entry._letters || [];
+  let lettersHtml;
+  if (letters.length === 0) {
+    // For derived-from-elsewhere stations, list source letters as links that jump
+    // to whichever chronology entry currently displays them.
+    const sourceIds = entry.source_letters || [];
+    const owner = state.data?.letterOwner;
+    const sourceLinks = sourceIds
+      .map(id => {
+        const ownerEntry = owner?.get(id);
+        if (!ownerEntry) return null;
+        const letter = (ownerEntry._letters || []).find(L => L.id === id);
+        if (!letter) return null;
+        const dateLabel = letter.date_iso ? formatDate(letter.date_iso, lang) : '';
+        const place = letter.author === 'Marianne' ? s.placeGloesa : loc(ownerEntry.place, lang);
+        return `<a href="#" class="source-letter-link" data-target-idx="${ownerEntry._globalIdx}">${escapeHtml(dateLabel)} · ${escapeHtml(place)}</a>`;
+      })
+      .filter(Boolean);
+    const derivedLabel = sourceLinks.length > 1 ? s.derivedFromMany : s.derivedFromOne;
+    const sourceBlock = sourceLinks.length
+      ? `<div class="derived-from"><span class="derived-label">${escapeHtml(derivedLabel)}</span> ${sourceLinks.join(' · ')}</div>`
+      : '';
+    lettersHtml = `<div class="no-letters">${escapeHtml(s.noLettersInWindow)}</div>${sourceBlock}`;
+  } else {
+    lettersHtml = letters.map(letter => renderLetterArticle(letter, entry, s, lang)).join('');
+  }
+
+  // EN-only banner: letter text is always shown in original German until the
+  // translation pass is done.
+  const translationBanner = (lang === 'en' && letters.length > 0)
+    ? `<div class="translation-banner">${escapeHtml(s.translationPending)}</div>`
+    : '';
+
+  const entryDescText = loc(entry.description, lang);
+  const entryDescHtml = entryDescText
+    ? `<div class="entry-desc">${escapeHtml(entryDescText)}</div>`
+    : '';
 
   document.getElementById('pane-body').innerHTML = `
     <section class="pane-section">
-      <div class="entry-desc">${escapeHtml(entry.description)}</div>
+      ${entryDescHtml}
       ${siblingsHtml}
     </section>
     <section class="pane-section">
       <h3>${escapeHtml(s.lettersHeading)}</h3>
-      <div class="placeholder-note">${escapeHtml(s.placeholderNote)}</div>
+      ${translationBanner}
       ${lettersHtml}
     </section>
   `;
@@ -1189,19 +1263,56 @@ function renderLetterPane(entry) {
     a.addEventListener('click', (ev) => {
       ev.preventDefault();
       const idx = parseInt(a.dataset.idx, 10);
-      const e = entryByGlobalIdx(state.lang, idx);
+      const e = entryByGlobalIdx(idx);
+      if (e) openLetterPaneByEntry(e);
+    });
+  });
+  document.querySelectorAll('.source-letter-link').forEach(a => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const idx = parseInt(a.dataset.targetIdx, 10);
+      const e = entryByGlobalIdx(idx);
       if (e) openLetterPaneByEntry(e);
     });
   });
 }
 
-function closeLetterPane() {
+// Render one letter article from the parser output. Wilhelm's letters are
+// tagged with the entry's place (he's at the front); Marianne writes from
+// Glösa. Body paragraphs preserve the parser's `kind` taxonomy: prose is
+// rendered normally, ocr_note is dimmed/italic, proofread_marker is dropped.
+function renderLetterArticle(letter, entry, s, lang) {
+  const isMarianne = letter.author === 'Marianne';
+  const senderLabel = isMarianne ? s.fromMarianne : s.fromWilhelm;
+  const fromPlace = isMarianne
+    ? s.placeGloesa
+    : (loc(letter.location_raw, lang) || loc(entry.place, lang));
+  const dateLabel = letter.date_iso ? formatDate(letter.date_iso, lang) : '';
+  const bodyHtml = (letter.body || []).map(p => {
+    if (p.kind === 'proofread_marker') return '';
+    const cls = p.kind === 'ocr_note' ? 'ocr-note' : 'prose';
+    return `<p class="${cls}">${escapeHtml(loc(p.text, lang))}</p>`;
+  }).join('');
+  const authorClass = isMarianne ? 'letter from-marianne' : 'letter from-wilhelm';
+  return `
+    <article class="${authorClass}" data-letter-id="${escapeHtml(letter.id)}">
+      <div class="letter-meta">
+        <span class="from">${escapeHtml(senderLabel)} · ${escapeHtml(fromPlace)}</span>
+        <span class="date">${escapeHtml(dateLabel)}</span>
+      </div>
+      <div class="letter-body">${bodyHtml}</div>
+    </article>
+  `;
+}
+
+function closeLetterPane({ pushHistory = true } = {}) {
   state.openPaneIndex = null;
   setActiveMarker(null);
   renderPaneNav();
   const pane = document.getElementById('letter-pane');
   pane.classList.remove('open');
   pane.setAttribute('aria-hidden', 'true');
+  if (pushHistory) syncHash(null);
 }
 
 // -------------------- overlays --------------------
@@ -1234,7 +1345,7 @@ function hideOverlay() {
 // disturbing UI state (chapter filter, map view, open pane, scroll position).
 function setLang(lang) {
   if (lang === state.lang) return;
-  if (!state.data[lang]) return; // safety: should never happen post-startup
+  if (!state.data) return; // safety: should never happen post-startup
   state.lang = lang;
   document.documentElement.lang = lang;
   document.getElementById('btn-de').classList.toggle('active', lang === 'de');
@@ -1243,8 +1354,8 @@ function setLang(lang) {
   renderChapterBar();
   renderMap();                              // refit=false: preserve current zoom/pan
   if (state.openPaneIndex !== null) {
-    const e = entryByGlobalIdx(state.lang, state.openPaneIndex);
-    if (e) openLetterPaneByEntry(e);         // re-render in new lang, keep scroll
+    const e = entryByGlobalIdx(state.openPaneIndex);
+    if (e) openLetterPaneByEntry(e, { pushHistory: false }); // re-render in new lang, keep scroll
   }
 }
 
@@ -1254,7 +1365,7 @@ function setChapter(ch) {
   // ...except for the currently-open pane entry's place — keep that override so
   // the marker keeps matching the pane content (e.g. "85" stays "85", not "83").
   if (state.openPaneIndex !== null) {
-    const e = entryByGlobalIdx(state.lang, state.openPaneIndex);
+    const e = entryByGlobalIdx(state.openPaneIndex);
     if (e && (ch === 'all' || e._chapter === ch)) {
       state.placeLabels.set(`${e.lat},${e.lon}`, e._globalIdx);
     }
@@ -1279,7 +1390,7 @@ function selectChapter(ch) {
   // the active selection and just apply the filter / refit. Only switch to
   // the chapter's first entry when crossing into a different chapter.
   const currentEntry = state.openPaneIndex !== null
-    ? entryByGlobalIdx(state.lang, state.openPaneIndex)
+    ? entryByGlobalIdx(state.openPaneIndex)
     : null;
   if (currentEntry && currentEntry._chapter === ch) {
     setChapter(ch);                       // pane stays; setChapter preserves its place label
@@ -1317,8 +1428,8 @@ function setScheme(scheme) {
   renderChapterBar();
   renderMap();                              // recolor without refitting the view
   if (state.openPaneIndex !== null) {
-    const e = entryByGlobalIdx(state.lang, state.openPaneIndex);
-    if (e) openLetterPaneByEntry(e);         // chapter swatch in pane uses scheme
+    const e = entryByGlobalIdx(state.openPaneIndex);
+    if (e) openLetterPaneByEntry(e, { pushHistory: false }); // re-render only — same entry
   }
 }
 
@@ -1336,10 +1447,10 @@ function renderSchemePicker() {
   }
 }
 
-async function loadAllLanguages() {
+async function loadAllData() {
   showLoading(STRINGS[state.lang].loading);
   try {
-    await Promise.all([loadLang('de'), loadLang('en')]);
+    await loadData();
     hideOverlay();
   } catch (err) {
     console.error(err);
@@ -1367,11 +1478,27 @@ function initMap() {
   });
 }
 
+// Browser back/forward (or external hash change): sync pane to whatever the
+// new hash points to. We push the suppress flag for our own writes so this
+// only fires for genuine user history navigation.
+window.addEventListener('hashchange', () => {
+  if (state._suppressHashChange) {
+    state._suppressHashChange = false;
+    return;
+  }
+  const target = entryFromHash();
+  if (target) {
+    openLetterPaneByEntry(target, { pushHistory: false });
+  } else {
+    closeLetterPane({ pushHistory: false });
+  }
+});
+
 document.getElementById('btn-de').addEventListener('click', () => setLang('de'));
 document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
 document.getElementById('scheme-select').addEventListener('change', (e) => setScheme(e.target.value));
 document.getElementById('all-btn').addEventListener('click', () => setChapter('all'));
-document.getElementById('pane-close').addEventListener('click', closeLetterPane);
+document.getElementById('pane-close').addEventListener('click', () => closeLetterPane());
 document.getElementById('pane-prev').addEventListener('click', () => navigateEntries(-1));
 document.getElementById('pane-next').addEventListener('click', () => navigateEntries(1));
 document.addEventListener('keydown', (e) => {
@@ -1385,9 +1512,13 @@ document.addEventListener('keydown', (e) => {
 (async function start() {
   initMap();
   renderSchemePicker();
-  await loadAllLanguages();
+  await loadAllData();
   renderChapterBar();
   renderMap({ refit: true });
+  // If the URL already names an entry (e.g. shared link, refresh), open it.
+  // Don't push history — the hash is already on the URL.
+  const initial = entryFromHash();
+  if (initial) openLetterPaneByEntry(initial, { pushHistory: false });
 })();
 </script>
 </body>

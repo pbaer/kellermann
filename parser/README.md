@@ -1,18 +1,23 @@
 # parser
 
-Turns the `kriegstagebuch-YYYY.txt` files into structured JSON and maps each letter to its page in `kriegstagebuch.pdf` to aid OCR proofreading.
+Turns the `kriegstagebuch-YYYY.txt` files into structured JSON, maps each letter to its page in `kriegstagebuch.pdf` for OCR proofreading, and produces the per-chapter `letters.jsonl` files that the website reads.
 
 ## Pipeline
 
 ```
-kriegstagebuch-YYYY.txt   →  parse.py     →  out/kriegstagebuch-YYYY.json
-kriegstagebuch.pdf        →  map_pdf.py   →  out/pages/page-NNN.png,
-                                             out/ocr.jsonl (cached),
-                                             out/letter_pages.json,
-                                             + merges pdf_page / pdf_page_range
-                                               back into the per-year JSON
-render_pages.py renders all PDF pages to PNG at 200 DPI (called separately).
+kriegstagebuch-YYYY.txt   →  parse.py                   →  out/kriegstagebuch-YYYY.json
+kriegstagebuch.pdf        →  map_pdf.py                 →  out/pages/page-NNN.png,
+                                                           out/ocr.jsonl (cached),
+                                                           out/letter_pages.json,
+                                                           + merges pdf_page / pdf_page_range
+                                                             back into the per-year JSON
+out/kriegstagebuch-YYYY.json + data/chapter-XX/chronology.jsonl
+                          →  build_chapter_letters.py   →  data/chapter-XX/letters.jsonl
+
+render_pages.py renders all PDF pages to PNG at 200 DPI (called separately, one-time).
 ```
+
+`out/` is git-ignored intermediate state. The site reads from `data/`.
 
 ## Running
 
@@ -20,9 +25,37 @@ render_pages.py renders all PDF pages to PNG at 200 DPI (called separately).
 .venv/bin/python parse.py --all            # parse all years
 .venv/bin/python render_pages.py           # render 167 pages to PNG (one-time)
 .venv/bin/python map_pdf.py                # OCR + map letters to pages
+.venv/bin/python build_chapter_letters.py  # bucket letters into data/chapter-XX/
 ```
 
-Re-run `parse.py` whenever the `.txt` files change. Re-run `map_pdf.py` afterward to re-merge page info. The OCR cache (`out/ocr.jsonl`) is reused unless deleted.
+The OCR cache (`out/ocr.jsonl`) is reused unless deleted.
+
+## Updating the data after editing a `kriegstagebuch-*.txt`
+
+The `.txt` files in the repo root are the source of truth. Anything in `data/chapter-XX/letters.jsonl` is derived from them and gets overwritten.
+
+**Typo / wording fix inside one letter** (no change to letter count or boundaries):
+
+```sh
+./run.sh    # parse → map_pdf → build_chapter_letters → proofread server
+```
+
+`./run.sh` from this directory does the full refresh in one shot. Or run the three Python steps individually if you don't want the proofreading server.
+
+**Splitting or merging a letter** (changes letter count, header lines change):
+
+Same command — `./run.sh`. The pipeline re-numbers letter ids (`YYYY-NNNN`) by source order within the year, so renumbering ripples through `data/chapter-XX/letters.jsonl` automatically. Watch the `build_chapter_letters.py` summary at the end:
+
+- `Per-chapter letter counts` should still total 515 (or whatever the current authoritative total is — the script asserts this).
+- `All boundary checks: OK` confirms the chapter-cut letter ids still match `expected_boundaries` in `build_chapter_letters.py`.
+
+If a split/merge straddles a chapter boundary, `expected_boundaries` and the `LETTER_CHAPTER_OVERRIDES` dict in `build_chapter_letters.py` may need updating.
+
+**Chronology / location data** (`data/chapter-XX/chronology.jsonl`) is hand-curated, not generated. Edit those files directly. If you change `arrival_date` values you may rebucket which chapter a letter falls into — re-run `build_chapter_letters.py` to refresh.
+
+**OCR markers in the `.txt` files** (preserve when editing):
+- `>>>>>` marks how far manual proofreading has progressed; ignored by the parser.
+- `#####` flags an ambiguous OCR reconstruction or unknown abbreviation; ignored by the parser.
 
 ## Proofreading workflow
 
@@ -35,8 +68,8 @@ For an interactive tool, run the local proofreading app:
 # open http://localhost:8765
 ```
 
-After making structural changes to a `.txt` file (splitting or merging letters, or any edit that changes letter count), kill the server and run `./run.sh` — it re-parses, re-maps pages, and starts the server in one shot.
+Three-pane UI: year/letter nav on the left, editable text in the middle, scanned page on the right. Ctrl+S commits to the source `.txt`; Ctrl+← / Ctrl+→ navigate (blocked when you have uncommitted changes).
 
-Three-pane UI: year/letter nav on the left, editable text in the middle, scanned page on the right. Ctrl+S commits to the source `.txt`; Ctrl+← / Ctrl+→ navigate (blocked when you have uncommitted changes). After a commit session, re-run `parse.py` and `map_pdf.py` to refresh the derived JSON.
+`./run.sh` re-parses, re-maps pages, rebuilds the per-chapter letters and starts the server in one shot — use it after a session that changes letter structure.
 
 See `schema.md` for the full output schema.
