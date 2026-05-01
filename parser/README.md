@@ -53,9 +53,10 @@ If a split/merge straddles a chapter boundary, `expected_boundaries` and the `LE
 
 **Chronology / location data** (`data/chapter-XX/chronology.jsonl`) is hand-curated, not generated. Edit those files directly. If you change `arrival_date` values you may rebucket which chapter a letter falls into — re-run `build_chapter_letters.py` to refresh.
 
-**OCR markers in the `.txt` files** (preserve when editing):
-- `>>>>>` marks how far manual proofreading has progressed; ignored by the parser.
-- `#####` flags an ambiguous OCR reconstruction or unknown abbreviation; ignored by the parser.
+**Markers in the `.txt` files** (preserve when editing):
+- `>>>>>` marks how far manual proofreading has progressed; the parser captures it as a `proofread_marker` paragraph (the map page drops it from rendering).
+- `#####` flags an ambiguous OCR reconstruction or unknown abbreviation; the parser captures it as an `ocr_note` paragraph.
+- `&&&&&` flags a brief annotation that summarizes the broader historical context of events, places, or people referenced in the surrounding letter text. The parser captures it as a `historical_context` paragraph; the map page renders it in a distinct font alongside the letter prose. These annotations are derived content — short stubs that downstream tooling will later expand into linked, more detailed historical material — and not part of Wilhelm's original transcription.
 
 ## Proofreading workflow
 

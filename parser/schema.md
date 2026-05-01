@@ -42,7 +42,7 @@ Front-matter-only fields:
 
 ```
 {
-  "kind": "prose" | "ocr_note" | "proofread_marker",
+  "kind": "prose" | "ocr_note" | "historical_context" | "proofread_marker",
   "text": "...",
   "parentheticals": [    // omitted when empty
     { "text": "...", "char_start": N, "char_end": N, "kind": "likely_retrospective" | "unclassified" }
@@ -50,10 +50,11 @@ Front-matter-only fields:
 }
 ```
 
-`kind` disambiguates the three kinds of paragraph that can appear inside a letter's body:
+`kind` disambiguates the kinds of paragraph that can appear inside a letter's body:
 
 - `prose` — normal letter or editorial-bridge text.
 - `ocr_note` — a paragraph beginning with `#####` (OCR ambiguity note).
+- `historical_context` — a paragraph beginning with `&&&&&` (brief annotation summarizing the broader historical context of events, places, or people referenced in the surrounding letter text). The marker is preserved in `text`; consumers may strip the leading `&&&&&` when rendering.
 - `proofread_marker` — a paragraph that is exactly `>>>>>` (manual-review boundary).
 
 `parentheticals` is only present on `prose` paragraphs that actually contain parentheses; the field is omitted otherwise. `char_start` / `char_end` are offsets into the joined paragraph text. Classification is coarse:

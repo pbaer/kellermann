@@ -31,6 +31,7 @@ OCC_RE = re.compile(
     r"Weihnachtstag|Weihnachtsfeiertag))|Ostern|Karfreitag|Heiligabend"
 )
 OCR_NOTE_PREFIX = "#####"
+HISTORICAL_CONTEXT_PREFIX = "&&&&&"
 PROOFREAD_MARKER = ">>>>>"
 
 NARRATIVE_TRIGGERS = (
@@ -216,6 +217,8 @@ def parse_file(path: Path, year: int) -> list[Entry]:
             stripped = p.strip()
             if stripped.startswith(OCR_NOTE_PREFIX):
                 kind = "ocr_note"
+            elif stripped.startswith(HISTORICAL_CONTEXT_PREFIX):
+                kind = "historical_context"
             elif stripped == PROOFREAD_MARKER:
                 kind = "proofread_marker"
             else:

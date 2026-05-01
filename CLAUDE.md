@@ -12,6 +12,8 @@ Note that the marker ">>>>>" in the .txt files indicates the extent of my manual
 
 The marker "#####" indicates a note regarding ambiguous OCR reconstruction or an unknown abbreviation.
 
+The marker "&&&&&" indicates a brief annotation that summarizes the broader historical context of events, places, or people referenced in the surrounding letter text — e.g. naming a campaign or operation and giving a one-or-two-sentence sketch. These annotations stay short on purpose: they are stubs that downstream tooling will later expand into more detailed, linked historical content shown in the map web app. Multiple letters can refer to the same broader topic, so each `&&&&&` annotation should be specific to *how* that letter touches the topic — not a full encyclopedia entry. They are derived content, not part of Wilhelm's original transcription, and like `#####` they live as their own paragraph (separated from surrounding text by blank lines).
+
 Any content we **derive** from the original source material will be in both German and English (stored in /data/de-DE or /data/en-US, respectively). Whenever possible we will preserve Wilhem's editorial voice (including contemporary terminology), but we have more leeway here, especially in the English translation.
 
 Any code, data, schemas, etc. that is independent of the content will all be in English only. And our chat interactions will be primarily in English, but I know German so feel free to use German where appropriate, e.g. when quoting the text.

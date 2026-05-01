@@ -578,6 +578,25 @@
     font-style: italic;
     font-size: 0.85rem;
   }
+  /* Historical-context annotations are derived editorial content, not part of
+     Wilhelm's transcription. The serif face deliberately breaks out of the
+     surrounding typewriter body so the reader can tell at a glance that this
+     paragraph is commentary rather than letter text. */
+  .letter .letter-body p.historical-context {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #4a3a2a;
+    background: #f0e8d6;
+    border-left: 3px solid #c9a86a;
+    padding: 8px 12px;
+    margin: 10px 0;
+    border-radius: 2px;
+  }
+  .letter.from-marianne .letter-body p.historical-context {
+    background: #ece5f2;
+    border-left-color: #a890c0;
+  }
   .translation-banner {
     background: #fff3d6;
     border: 1px dashed #c9a86a;
@@ -1543,7 +1562,8 @@ function renderLetterPane(entry) {
 // Render one letter article from the parser output. Wilhelm's letters are
 // tagged with the entry's place (he's at the front); Marianne writes from
 // Glösa. Body paragraphs preserve the parser's `kind` taxonomy: prose is
-// rendered normally, ocr_note is dimmed/italic, proofread_marker is dropped.
+// rendered normally, ocr_note is dimmed/italic, historical_context is
+// rendered as a serif callout, proofread_marker is dropped.
 function renderLetterArticle(letter, entry, s, lang) {
   const isMarianne = letter.author === 'Marianne';
   const senderLabel = isMarianne ? s.fromMarianne : s.fromWilhelm;
@@ -1553,8 +1573,16 @@ function renderLetterArticle(letter, entry, s, lang) {
   const dateLabel = letter.date_iso ? formatDate(letter.date_iso, lang) : '';
   const bodyHtml = (letter.body || []).map(p => {
     if (p.kind === 'proofread_marker') return '';
-    const cls = p.kind === 'ocr_note' ? 'ocr-note' : 'prose';
-    return `<p class="${cls}">${escapeHtml(loc(p.text, lang))}</p>`;
+    let cls = 'prose';
+    if (p.kind === 'ocr_note') cls = 'ocr-note';
+    else if (p.kind === 'historical_context') cls = 'historical-context';
+    let text = loc(p.text, lang);
+    // The leading sigil (&&&&&) is metadata, not display content — strip it
+    // and the immediately following whitespace before rendering.
+    if (p.kind === 'historical_context') {
+      text = text.replace(/^&{5,}\s*/, '');
+    }
+    return `<p class="${cls}">${escapeHtml(text)}</p>`;
   }).join('');
   const authorClass = isMarianne ? 'letter from-marianne' : 'letter from-wilhelm';
   return `

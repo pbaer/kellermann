@@ -16,7 +16,7 @@ von Wilhelm, <Ort>, den <Datum>
 von Marianne, <Ort>, den <Datum>
 ```
 
-Eingeschobene Passagen in Klammern sind spätere Anmerkungen Wilhelms (1989), die den militärischen Kontext erläutern oder Lücken zwischen den Briefen schließen. Besonders 1942/43 und ab April 1945 fehlen Teile der Korrespondenz – Wilhelm hat die Lücken dort durch erzählende Überleitungen geschlossen. Zeilen, die mit `#####` beginnen, sind Kommentare des Projekts zu unsicheren OCR-Rekonstruktionen und gehören nicht zur Originalquelle. Die Marke `>>>>>` zeigt den Stand der manuellen Korrekturlesung an und wird vom Parser ignoriert.
+Eingeschobene Passagen in Klammern sind spätere Anmerkungen Wilhelms (1989), die den militärischen Kontext erläutern oder Lücken zwischen den Briefen schließen. Besonders 1942/43 und ab April 1945 fehlen Teile der Korrespondenz – Wilhelm hat die Lücken dort durch erzählende Überleitungen geschlossen. Zeilen, die mit `#####` beginnen, sind Kommentare des Projekts zu unsicheren OCR-Rekonstruktionen und gehören nicht zur Originalquelle. Zeilen, die mit `&&&&&` beginnen, sind kurze, von Claude generierte Anmerkungen zum geschichtlichen Hintergrund der im Brief erwähnten Ereignisse, Orte oder Personen; sie sind ebenfalls nicht Teil der Originalquelle und werden später zu ausführlicheren, verlinkten Hintergrundtexten ausgebaut. Die Marke `>>>>>` zeigt den Stand der manuellen Korrekturlesung an und wird vom Parser ignoriert.
 
 ## Hauptpersonen
 
