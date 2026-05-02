@@ -57,6 +57,8 @@ Front-matter-only fields:
 - `historical_context` — a paragraph beginning with `&&&&&` (brief annotation summarizing the broader historical context of events, places, or people referenced in the surrounding letter text). The marker is preserved in `text`; consumers may strip the leading `&&&&&` when rendering.
 - `proofread_marker` — a paragraph that is exactly `>>>>>` (manual-review boundary).
 
+**Authoring convention** (not enforced by the parser): within a letter, paragraphs are written in the order `prose…`, then any `ocr_note`, then any `historical_context`. The parser preserves source order verbatim — it does not validate or reorder. Consumers (e.g. the map renderer) must tolerate annotations appearing in any position within a letter; the only hard guarantee is that every paragraph between two letter headers belongs to the preceding letter. See `parser/README.md` for the authoring rules.
+
 `parentheticals` is only present on `prose` paragraphs that actually contain parentheses; the field is omitted otherwise. `char_start` / `char_end` are offsets into the joined paragraph text. Classification is coarse:
 
 - `likely_retrospective`: contains `Wilh.` / `Wilhelm`, a post-1945 year, or words like `später`, `jahrzehntelang`, `inzwischen`, `erinnert sich`.

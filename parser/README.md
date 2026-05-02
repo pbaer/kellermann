@@ -58,6 +58,8 @@ If a split/merge straddles a chapter boundary, `expected_boundaries` and the `LE
 - `#####` flags an ambiguous OCR reconstruction or unknown abbreviation; the parser captures it as an `ocr_note` paragraph.
 - `&&&&&` flags a brief annotation that summarizes the broader historical context of events, places, or people referenced in the surrounding letter text. The parser captures it as a `historical_context` paragraph; the map page renders it in a distinct font alongside the letter prose. These annotations are derived content — short stubs that downstream tooling will later expand into linked, more detailed historical material — and not part of Wilhelm's original transcription.
 
+**Per-letter ordering convention:** within a letter (i.e. between two `von …` headers), prose paragraphs come first, then any `#####` notes, then any `&&&&&` annotations. The hard rule is only that all of a letter's content sits between its header and the next letter's header; the parser preserves source order and downstream consumers must tolerate annotations appearing out of order. The convention is what we follow when authoring or auditing source files. If a `&&&&&` annotation depends on a `#####` ambiguity in the same letter, the annotation should hedge accordingly (e.g. „vermutlich …").
+
 ## Proofreading workflow
 
 Each letter in the per-year JSON has either a `pdf_page` (exact) or a `pdf_page_range` (narrow range when OCR missed the date). Open the matching `out/pages/page-NNN.png` alongside the `.txt` to spot OCR errors.
