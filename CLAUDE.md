@@ -24,6 +24,10 @@ Any content we **derive** from the original source material will be in both Germ
 
 Any code, data, schemas, etc. that is independent of the content will all be in English only. And our chat interactions will be primarily in English, but I know German so feel free to use German where appropriate, e.g. when quoting the text.
 
+## Testing
+
+- **Playwright screenshots.** Any screenshots taken during browser-based testing go into `.playwright-mcp/` (already `.gitignore`d). Clean them up when the testing task is done — don't leave stray PNGs behind.
+
 ## Website principles
 
 These guide every change to the interactive website. New principles get added here as they come up.
