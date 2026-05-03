@@ -27,6 +27,7 @@ TRANSCRIPT = AUDIO_ROOT / "transcript.txt"
 HERE = Path(__file__).resolve().parent
 PORT = 8766
 PROOFREAD_MARKER = ">>>>>"
+ANNOTATION_MARKER = "#####"
 
 CLIP_HEADER_RE = re.compile(r"^===\s+(.+?)\s+===\s*$")
 TIMESTAMP_RE = re.compile(r"^\[(\d+):(\d{2})(?::(\d{2}))?\]")
@@ -64,6 +65,13 @@ class State:
         A block is a paragraph (run of non-blank, non-marker lines) that lives
         under a clip header (=== ... ===). Clip headers and blank/marker lines
         themselves are skipped — they are not blocks.
+
+        ##### annotation paragraphs (per CLAUDE.md: short notes about ambiguous
+        OCR or unknown abbreviations) belong to the immediately preceding
+        prose paragraph and get folded into that block — they don't form
+        nav-pane entries on their own. The block's line range is extended over
+        any blanks/markers up through the last folded annotation; preview and
+        speaker detection ignore the annotation lines.
         """
         self.blocks = []
         current_clip: str | None = None
@@ -80,6 +88,8 @@ class State:
                 i += 1
                 continue
             block_start = i
+            is_pure_annotation = stripped.startswith(ANNOTATION_MARKER)
+            # Walk to end of this paragraph.
             while i < n:
                 s = self.lines[i].strip()
                 if s == "" or s == PROOFREAD_MARKER:
@@ -87,11 +97,43 @@ class State:
                 if CLIP_HEADER_RE.match(self.lines[i]):
                     break
                 i += 1
-            block_end = i - 1  # inclusive
+            prose_end = i - 1  # inclusive; last line of prose paragraph
+            block_end = prose_end
+
+            # If this paragraph is prose, look ahead for ##### annotation
+            # paragraphs and fold them into this block. Skip blank/marker
+            # separators between them. Stop at a clip header or a fresh prose
+            # paragraph.
+            if not is_pure_annotation:
+                j = i
+                while j < n:
+                    if CLIP_HEADER_RE.match(self.lines[j]):
+                        break
+                    s = self.lines[j].strip()
+                    if s == "" or s == PROOFREAD_MARKER:
+                        j += 1
+                        continue
+                    if not s.startswith(ANNOTATION_MARKER):
+                        break  # next prose paragraph — stop folding
+                    # Consume this annotation paragraph.
+                    block_end = j
+                    j += 1
+                    while j < n:
+                        s2 = self.lines[j].strip()
+                        if (s2 == "" or s2 == PROOFREAD_MARKER
+                                or CLIP_HEADER_RE.match(self.lines[j])):
+                            break
+                        block_end = j
+                        j += 1
+                i = j
+
             first = self.lines[block_start]
             start_seconds = parse_timestamp(first)
-            preview = self._make_preview(self.lines[block_start:block_end + 1])
-            speakers = sorted({m.group(1) for line in self.lines[block_start:block_end + 1]
+            # Preview and speaker detection use only the prose paragraph —
+            # the annotation isn't part of the recorded speech.
+            prose_lines = self.lines[block_start:prose_end + 1]
+            preview = self._make_preview(prose_lines)
+            speakers = sorted({m.group(1) for line in prose_lines
                                for m in SPEAKER_RE.finditer(line)})
             block_id = f"{len(self.blocks):04d}"
             self.blocks.append({

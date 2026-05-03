@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap">
 <style>
   * { box-sizing: border-box; }
+  /* Cool slate-teal that contrasts with the warm beige palette without
+     fighting the Wilhelm-blue / Marianne-purple author colors. Used to mark
+     the currently-selected nav row and to subtly tint the matching letter-id
+     in the editor header. */
+  :root { --selection-accent: #3a6878; }
   html, body { margin: 0; padding: 0; height: 100vh; font-family: Georgia, "Times New Roman", serif; overflow: hidden; color: #2a2520; background: #f4f1ea; }
   body { display: grid; grid-template-columns: var(--nav-width, 260px) var(--editor-width, 620px) 1fr; grid-template-rows: 100vh; }
   body.resizing { cursor: col-resize; user-select: none; }
@@ -64,11 +69,16 @@
   }
   #nav li + li { border-top: 1px solid #efe7d4; }
   #nav li:hover { background: rgba(201, 168, 106, 0.18); }
-  #nav li.active { background: rgba(201, 168, 106, 0.32); border-left-color: #c9a86a; color: #2a2520; }
   #nav li.proofread { color: #8a7a5a; }
   #nav li.proofread::after { content: "✓"; position: absolute; right: 10px; color: #6b7a3a; font-weight: bold; font-size: 0.75rem; }
   #nav li.next-up { border-left-color: #c9a86a; background: rgba(201, 168, 106, 0.22); color: #2a2520; }
   #nav li.next-up::after { content: "▶"; position: absolute; right: 10px; color: #8a6a3a; font-size: 0.7rem; }
+  /* .active rule comes last so it wins when an item is also .next-up. */
+  #nav li.active {
+    background: color-mix(in srgb, var(--selection-accent) 22%, transparent);
+    border-left-color: var(--selection-accent);
+    color: #2a2520;
+  }
   #nav li .badge {
     display: inline-block;
     width: 16px;
@@ -117,7 +127,7 @@
   #editor-header .title { font-size: 0.88rem; color: #3a322a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   #editor-header .title strong {
     font-family: "Courier New", Courier, monospace;
-    color: #8a6a3a;
+    color: var(--selection-accent);
     font-weight: bold;
     letter-spacing: 0.02em;
   }

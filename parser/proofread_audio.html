@@ -8,6 +8,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap">
 <style>
   * { box-sizing: border-box; }
+  /* Cool slate-teal that contrasts with the warm beige palette without
+     fighting the Wilhelm-blue / Marianne-purple author colors. Used to mark
+     the currently-selected nav row and to subtly tint the matching block-id
+     in the editor header. */
+  :root { --selection-accent: #3a6878; }
   html, body { margin: 0; padding: 0; height: 100vh; font-family: Georgia, "Times New Roman", serif; overflow: hidden; color: #2a2520; background: #f4f1ea; }
   body { display: grid; grid-template-columns: var(--nav-width, 320px) 1fr; grid-template-rows: 100vh; }
   body.resizing { cursor: col-resize; user-select: none; }
@@ -92,11 +97,16 @@
   }
   #nav li + li { border-top: 1px solid #efe7d4; }
   #nav li:hover { background: rgba(201, 168, 106, 0.18); }
-  #nav li.active { background: rgba(201, 168, 106, 0.32); border-left-color: #c9a86a; color: #2a2520; }
   #nav li.proofread { color: #8a7a5a; }
   #nav li.proofread::after { content: "✓"; position: absolute; right: 10px; color: #6b7a3a; font-weight: bold; font-size: 0.72rem; }
   #nav li.next-up { border-left-color: #c9a86a; background: rgba(201, 168, 106, 0.22); color: #2a2520; }
   #nav li.next-up::after { content: "▶"; position: absolute; right: 10px; color: #8a6a3a; font-size: 0.7rem; }
+  /* .active rule comes last so it wins when an item is also .next-up. */
+  #nav li.active {
+    background: color-mix(in srgb, var(--selection-accent) 22%, transparent);
+    border-left-color: var(--selection-accent);
+    color: #2a2520;
+  }
   #nav li .ts { font-variant-numeric: tabular-nums; color: #6a5a3a; font-family: "Courier New", Courier, monospace; font-size: 0.74rem; }
   #nav li .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 16px; }
   #nav li.no-ts .ts { color: #b8a888; font-style: italic; }
@@ -119,7 +129,7 @@
   #header .title { font-size: 0.88rem; color: #3a322a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
   #header .title strong {
     font-family: "Courier New", Courier, monospace;
-    color: #8a6a3a;
+    color: var(--selection-accent);
     font-weight: bold;
     letter-spacing: 0.02em;
     margin-right: 6px;
@@ -623,10 +633,19 @@ function computeBlockEnd(idx) {
   return null; // last block in clip — fall back to audio.duration when known
 }
 
+// Start playback 1 second before the block's logical start so the spoken
+// content doesn't begin abruptly. Clamped to 0 so blocks that begin at the
+// very top of an mp3 file aren't shifted into negative time. The displayed
+// playback range is [leadInStart, blockEnd], so the lead-in counts toward
+// the clip length shown in the scrubber/time-readout.
+function leadInStart() {
+  return Math.max(0, blockStart - 1);
+}
+
 function blockDuration() {
   const audio = $("audio");
   const end = blockEnd != null ? blockEnd : (audio.duration || 0);
-  return Math.max(0, end - blockStart);
+  return Math.max(0, end - leadInStart());
 }
 
 function updateAudioForBlock() {
@@ -635,7 +654,12 @@ function updateAudioForBlock() {
   blockStart = (currentBlock && currentBlock.start_seconds) || 0;
   blockEnd = computeBlockEnd(currentIdx);
 
-  const audioUrl = currentBlock && currentBlock.clip ? currentBlock.audio_url : "";
+  // A block only has playable audio if it has both a clip and a [m:ss]
+  // timestamp on its first line. Meta paragraphs ("(0:28–4:05 weitgehend
+  // unverständlich; …)") describe a span of audio but aren't playable
+  // material — start_seconds is null, so disable playback.
+  const hasAudio = !!(currentBlock && currentBlock.clip && currentBlock.start_seconds != null);
+  const audioUrl = hasAudio ? currentBlock.audio_url : "";
   const playbackBtns = [
     $("btn-play-from-start"), $("btn-back-3"), $("btn-fwd-3"),
     $("btn-play-pause"),
@@ -662,7 +686,7 @@ function updateAudioForBlock() {
   if (placeholder) placeholder.remove();
   playbackBtns.forEach(b => { b.disabled = false; });
 
-  const target = blockStart;
+  const target = leadInStart();
   const shouldPlay = autoplayEnabled();
   if (audioUrl !== lastLoadedAudio) {
     pendingSeek = target;
@@ -686,7 +710,7 @@ function updateAudioPosition() {
     $("scrubber-time").textContent = "0:00 / 0:00";
     return;
   }
-  const rel = Math.max(0, Math.min(dur, (audio.currentTime || 0) - blockStart));
+  const rel = Math.max(0, Math.min(dur, (audio.currentTime || 0) - leadInStart()));
   const pct = (rel / dur) * 100;
   $("scrubber-fill").style.width = `${pct}%`;
   $("scrubber-thumb").style.left = `${pct}%`;
@@ -696,7 +720,7 @@ function updateAudioPosition() {
 function playFromStart() {
   if (!currentBlock || !currentBlock.clip) return;
   const audio = $("audio");
-  const target = currentBlock.start_seconds || 0;
+  const target = leadInStart();
   const seek = () => {
     try { audio.currentTime = target; } catch {}
     audio.play().catch(() => {});
@@ -852,7 +876,7 @@ $("btn-play-from-start").addEventListener("click", playFromStart);
 $("btn-back-3").addEventListener("click", () => {
   const a = $("audio");
   if (!a.src) return;
-  try { a.currentTime = Math.max(blockStart, a.currentTime - 3); } catch {}
+  try { a.currentTime = Math.max(leadInStart(), a.currentTime - 3); } catch {}
 });
 $("btn-fwd-3").addEventListener("click", () => {
   const a = $("audio");
@@ -866,8 +890,9 @@ $("btn-play-pause").addEventListener("click", () => {
   if (!audio.src) return;
   if (audio.paused) {
     const limit = blockEnd != null ? blockEnd : (Number.isFinite(audio.duration) ? audio.duration : Infinity);
-    if (audio.currentTime < blockStart || audio.currentTime >= limit) {
-      try { audio.currentTime = blockStart; } catch {}
+    const lead = leadInStart();
+    if (audio.currentTime < lead || audio.currentTime >= limit) {
+      try { audio.currentTime = lead; } catch {}
     }
     audio.play().catch(() => {});
   } else {
@@ -883,7 +908,7 @@ function seekToScrubber(e) {
   const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
   const dur = blockDuration();
   if (dur <= 0) return;
-  try { audio.currentTime = blockStart + ratio * dur; } catch {}
+  try { audio.currentTime = leadInStart() + ratio * dur; } catch {}
   updateAudioPosition();
 }
 $("scrubber").addEventListener("mousedown", e => {
