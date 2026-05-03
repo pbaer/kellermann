@@ -6,6 +6,10 @@ The goal ultimately is to share their story in multiple media formats:
 
 But we're working one step at a time, we're not one-shotting this.
 
+Original source materials live under `sources/`:
+- `sources/documents/` holds the OCR'd `kriegstagebuch-*.txt` files alongside the scanned `kriegstagebuch.pdf`. Future PDFs follow the same pairing convention: `<file>.pdf` + a colocated `<file>.txt` transcription.
+- `sources/audio/` holds the recorded interviews and their transcripts.
+
 We're going to keep the primary content source (the `kriegstagebuch-*.txt` files) in the original German, and any changes we make to it (e.g. formatting, fixing OCR errors, etc.) MUST preserve the original intent as much as possible (including preserving abbreviations, contemporary place names, etc.). We are not going to apply any editorial voice to Wilhelm's content - technical fixes only!
 
 Note that the marker ">>>>>" in the .txt files indicates the extent of my manual proofreading review. Ignore it.

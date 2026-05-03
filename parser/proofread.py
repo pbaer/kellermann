@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+DOCS = ROOT / "sources" / "documents"
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
 YEARS = list(range(1939, 1946))
@@ -38,7 +39,7 @@ class State:
         self.years: dict[int, dict] = {}
         for year in YEARS:
             jp = OUT / f"kriegstagebuch-{year}.json"
-            tp = ROOT / f"kriegstagebuch-{year}.txt"
+            tp = DOCS / f"kriegstagebuch-{year}.txt"
             if not (jp.exists() and tp.exists()):
                 continue
             data = json.load(jp.open(encoding="utf-8"))

@@ -29,7 +29,7 @@ Letter-only fields:
 | `location` | `{raw, uncertain, narrative}` | `uncertain=true` if `?` is present. `narrative=true` for phrases like `auf Fahrt`, `Angriff auf Jug.`. No normalization / gazetteer yet. |
 | `date` | `{raw, iso, annotations, occasion}` | `iso` is `YYYY-MM-DD` or `null`. `occasion` captures `1. Ostertag`, `4. Advent`, etc. |
 | `body` | `Paragraph[]` | Paragraphs are separated by blank lines in the source. Line breaks within a paragraph are collapsed: a trailing `-` on a line is removed and the next line is joined with no space (German word-break convention); otherwise lines are joined with a single space. |
-| `pdf_page` | int \| absent | 1-indexed page in `kriegstagebuch.pdf`. Present only when `map_pdf.py` has been run AND the letter's OCR date anchored to a specific page. PDF page 1 is the cover; PDF page N corresponds to typewriter page N−1 (visible in the scan's top-right corner). |
+| `pdf_page` | int \| absent | 1-indexed page in `sources/documents/kriegstagebuch.pdf`. Present only when `map_pdf.py` has been run AND the letter's OCR date anchored to a specific page. PDF page 1 is the cover; PDF page N corresponds to typewriter page N−1 (visible in the scan's top-right corner). |
 | `pdf_page_range` | `[int, int]` \| absent | Present (instead of `pdf_page`) when the OCR missed this letter's date. The letter is guaranteed to be on one of the pages in the inclusive range, inferred from surrounding matched letters (since PDF order is identical to .txt order). |
 
 Front-matter-only fields:

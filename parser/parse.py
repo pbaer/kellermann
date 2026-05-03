@@ -19,6 +19,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+DOCS = ROOT / "sources" / "documents"
 OUT = Path(__file__).resolve().parent / "out"
 YEARS = list(range(1939, 1946))
 
@@ -290,7 +291,7 @@ def main() -> int:
     total_errors = 0
     grand_total_letters = 0
     for year in years_to_process:
-        path = ROOT / f"kriegstagebuch-{year}.txt"
+        path = DOCS / f"kriegstagebuch-{year}.txt"
         if not path.exists():
             print(f"SKIP: {path} does not exist")
             continue

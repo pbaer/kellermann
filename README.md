@@ -2,10 +2,15 @@
 
 Dieses Repository enthält den Briefwechsel zwischen Wilhelm Kellermann (*02.09.1913) und seiner Frau Marianne, geb. Klingberg (*22.04.1915), während Wilhelms Dienstzeit in der deutschen Wehrmacht im Zweiten Weltkrieg. Wilhelm hat die Feldpostbriefe 1989 als „Kriegstagebuch 1939–1945 eines Stabsgefreiten" zusammengestellt. Marianne ist die Großmutter mütterlicherseits des Projektinhabers; ihre Tochter Helga (*07.05.1940) ist seine Mutter.
 
-| Datei | Inhalt |
+Originalquellen liegen unter `sources/`:
+
+| Pfad | Inhalt |
 |---|---|
-| `kriegstagebuch.pdf` | Gescannte Rohvorlage der von Wilhelm 1989 erstellten Zusammenstellung |
-| `kriegstagebuch-1939.txt` bis `kriegstagebuch-1945.txt` | OCR-erfasster Text, jahrweise aufgeteilt; textlich getreue Wiedergabe des PDFs |
+| `sources/documents/kriegstagebuch.pdf` | Gescannte Rohvorlage der von Wilhelm 1989 erstellten Zusammenstellung |
+| `sources/documents/kriegstagebuch-1939.txt` bis `kriegstagebuch-1945.txt` | OCR-erfasster Text, jahrweise aufgeteilt; textlich getreue Wiedergabe des PDFs |
+| `sources/audio/` | Aufgezeichnete Interviews mit Wilhelm (1982–1996) samt Transkripten |
+
+Weitere PDF-Dokumente folgen in `sources/documents/` derselben Konvention: zu jeder `<datei>.pdf` liegt eine zugehörige `<datei>.txt` mit der Transkription daneben.
 
 Die Textdateien sind chronologisch aufgebaut und die Quelle der Wahrheit. Alles unter `data/chapter-XX/letters.jsonl` wird daraus abgeleitet — siehe `parser/README.md` für die Pipeline und für die Schritte nach einer Korrektur an den `.txt`-Dateien (Tippfehler, Zusammenführen oder Aufteilen von Briefen). `data/chapter-XX/chronology.jsonl` ist dagegen handgepflegt und wird nicht regeneriert.
 

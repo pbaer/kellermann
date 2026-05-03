@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render each page of kriegstagebuch.pdf to a PNG.
+"""Render each page of sources/documents/kriegstagebuch.pdf to a PNG.
 
 Output: parser/out/pages/page-001.png … page-NNN.png
 Page 1 is the cover; page N (N>=2) corresponds to typewriter page N-1.
@@ -9,7 +9,7 @@ from pathlib import Path
 import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
-PDF = ROOT / "kriegstagebuch.pdf"
+PDF = ROOT / "sources" / "documents" / "kriegstagebuch.pdf"
 OUT = Path(__file__).resolve().parent / "out" / "pages"
 DPI = 200
 

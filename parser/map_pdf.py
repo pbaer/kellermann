@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OCR each page of kriegstagebuch.pdf, then map each letter to its page.
+"""OCR each page of sources/documents/kriegstagebuch.pdf, then map each letter to its page.
 
 Primary alignment is a monotone walk over OCR date candidates: for each letter
 we look for an OCR line whose day+month digits match the letter's date, pick
@@ -33,7 +33,7 @@ import pymupdf
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__file__).resolve().parent / "out"
-PDF = ROOT / "kriegstagebuch.pdf"
+PDF = ROOT / "sources" / "documents" / "kriegstagebuch.pdf"
 OCR_CACHE = OUT / "ocr.jsonl"
 MAPPING = OUT / "letter_pages.json"
 YEARS = range(1939, 1946)

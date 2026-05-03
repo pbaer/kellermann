@@ -1,6 +1,7 @@
 **/pycache/
 **/__pycache__/
 **/venv/
+**/.venv/
 **/.env
 **/.playwright-mcp/
 **/.claude/

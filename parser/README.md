@@ -1,12 +1,14 @@
 # parser
 
-Turns the `kriegstagebuch-YYYY.txt` files into structured JSON, maps each letter to its page in `kriegstagebuch.pdf` for OCR proofreading, and produces the per-chapter `letters.jsonl` files that the website reads.
+Turns the `sources/documents/kriegstagebuch-YYYY.txt` files into structured JSON, maps each letter to its page in `sources/documents/kriegstagebuch.pdf` for OCR proofreading, and produces the per-chapter `letters.jsonl` files that the website reads.
 
 ## Pipeline
 
 ```
-kriegstagebuch-YYYY.txt   →  parse.py                   →  out/kriegstagebuch-YYYY.json
-kriegstagebuch.pdf        →  map_pdf.py                 →  out/pages/page-NNN.png,
+sources/documents/kriegstagebuch-YYYY.txt
+                          →  parse.py                   →  out/kriegstagebuch-YYYY.json
+sources/documents/kriegstagebuch.pdf
+                          →  map_pdf.py                 →  out/pages/page-NNN.png,
                                                            out/ocr.jsonl (cached),
                                                            out/letter_pages.json,
                                                            + merges pdf_page / pdf_page_range
@@ -32,7 +34,7 @@ The OCR cache (`out/ocr.jsonl`) is reused unless deleted.
 
 ## Updating the data after editing a `kriegstagebuch-*.txt`
 
-The `.txt` files in the repo root are the source of truth. Anything in `data/chapter-XX/letters.jsonl` is derived from them and gets overwritten.
+The `.txt` files under `sources/documents/` are the source of truth. Anything in `data/chapter-XX/letters.jsonl` is derived from them and gets overwritten.
 
 **Typo / wording fix inside one letter** (no change to letter count or boundaries):
 
