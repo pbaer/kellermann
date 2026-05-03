@@ -227,14 +227,6 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):
         pass
 
-    def handle(self):
-        # Browsers routinely abort streaming Range requests for <audio>;
-        # don't spam the console with the resulting tracebacks.
-        try:
-            super().handle()
-        except (BrokenPipeError, ConnectionResetError):
-            pass
-
     def _send(self, body: bytes, content_type: str, status: int = 200,
               extra: dict | None = None) -> None:
         self.send_response(status)
@@ -252,6 +244,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send_audio(self, p: Path) -> None:
         # Honor Range requests so the browser can seek without re-downloading.
+        # Browsers routinely close <audio> Range connections early — after
+        # probing metadata, after seeking past the buffered window, or when
+        # the user navigates away mid-load. The next write() then raises
+        # ECONNRESET / EPIPE. There's no body left to deliver, no recovery to
+        # do; swallow just those specific exceptions so the rest of the
+        # tool's error reporting stays unsuppressed.
         size = p.stat().st_size
         rng = self.headers.get("Range")
         ext = p.suffix.lower()
@@ -261,47 +259,51 @@ class Handler(BaseHTTPRequestHandler):
             ".wav": "audio/wav",
             ".ogg": "audio/ogg",
         }.get(ext, "application/octet-stream")
-        if rng and rng.startswith("bytes="):
-            try:
-                spec = rng[len("bytes="):]
-                start_s, end_s = spec.split("-", 1)
-                start = int(start_s) if start_s else 0
-                end = int(end_s) if end_s else size - 1
-                end = min(end, size - 1)
-                if start > end or start >= size:
-                    raise ValueError
-            except ValueError:
-                self.send_response(416)
-                self.send_header("Content-Range", f"bytes */{size}")
+        try:
+            if rng and rng.startswith("bytes="):
+                try:
+                    spec = rng[len("bytes="):]
+                    start_s, end_s = spec.split("-", 1)
+                    start = int(start_s) if start_s else 0
+                    end = int(end_s) if end_s else size - 1
+                    end = min(end, size - 1)
+                    if start > end or start >= size:
+                        raise ValueError
+                except ValueError:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.end_headers()
+                    return
+                length = end - start + 1
+                with p.open("rb") as f:
+                    f.seek(start)
+                    body = f.read(length)
+                self.send_response(206)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(length))
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Cache-Control", "private, max-age=3600")
                 self.end_headers()
+                self.wfile.write(body)
                 return
-            length = end - start + 1
-            with p.open("rb") as f:
-                f.seek(start)
-                body = f.read(length)
-            self.send_response(206)
+            # Full-body response. Stream from disk so a browser that aborts
+            # after reading metadata doesn't force us to buffer the whole
+            # file in RAM.
+            self.send_response(200)
             self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(length))
-            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Content-Length", str(size))
             self.send_header("Accept-Ranges", "bytes")
             self.send_header("Cache-Control", "private, max-age=3600")
             self.end_headers()
-            self.wfile.write(body)
+            with p.open("rb") as f:
+                while True:
+                    chunk = f.read(64 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
             return
-        # Full-body response. Stream from disk so a browser that aborts after
-        # reading metadata doesn't force us to buffer the whole file in RAM.
-        self.send_response(200)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Content-Length", str(size))
-        self.send_header("Accept-Ranges", "bytes")
-        self.send_header("Cache-Control", "private, max-age=3600")
-        self.end_headers()
-        with p.open("rb") as f:
-            while True:
-                chunk = f.read(64 * 1024)
-                if not chunk:
-                    break
-                self.wfile.write(chunk)
 
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
@@ -327,6 +329,14 @@ class Handler(BaseHTTPRequestHandler):
             with STATE_LOCK:
                 summaries = STATE.summaries()
             self._send_json(summaries)
+            return
+
+        if path == "/api/search-index":
+            with STATE_LOCK:
+                idx = [{"id": b["id"],
+                        "text": STATE.raw_text(b["line_start"], b["line_end"])}
+                       for b in STATE.blocks]
+            self._send_json(idx)
             return
 
         m = re.fullmatch(r"/api/block/(\d{4})", path)

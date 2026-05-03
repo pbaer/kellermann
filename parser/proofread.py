@@ -308,6 +308,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(STATE.summaries())
             return
 
+        if path == "/api/search-index":
+            idx = [{"id": l["id"],
+                    "text": STATE.raw_text(l["year"], l["line_start"], l["line_end"])}
+                   for l in STATE.letters]
+            self._send_json(idx)
+            return
+
         m = re.fullmatch(r"/api/letter/(\d{4}-\d{4})", path)
         if m:
             lid = m.group(1)

@@ -3,17 +3,37 @@
 <head>
 <meta charset="utf-8">
 <title>Audio Proof-Listener</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap">
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100vh; font-family: Georgia, "Times New Roman", serif; overflow: hidden; color: #2a2520; background: #f4f1ea; }
   body { display: grid; grid-template-columns: var(--nav-width, 320px) 1fr; grid-template-rows: 100vh; }
   body.resizing { cursor: col-resize; user-select: none; }
   body.resizing * { user-select: none !important; }
+  body.scrubbing { user-select: none; }
+  body.scrubbing * { user-select: none !important; }
 
   button { font-family: inherit; }
 
   /* Nav */
-  #nav { overflow-y: auto; border-right: 1px solid #d9cfb8; background: #efe7d4; }
+  #nav { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #d9cfb8; background: #efe7d4; }
+  #nav-fixed { flex: 0 0 auto; }
+  #nav-list { flex: 1 1 auto; overflow-y: auto; }
+  .autoplay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #efe7d4;
+    border-bottom: 1px solid #d9cfb8;
+    font-size: 0.78rem;
+    color: #4a3f32;
+    cursor: pointer;
+    user-select: none;
+  }
+  .autoplay-toggle input { cursor: pointer; }
   #nav h1 {
     margin: 0;
     padding: 10px 14px;
@@ -26,9 +46,6 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    position: sticky;
-    top: 0;
-    z-index: 2;
   }
   #nav h1 .progress { color: #c9a86a; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
   #nav .clip { border-bottom: 1px solid #d9cfb8; }
@@ -136,7 +153,46 @@
     gap: 14px;
     flex-wrap: wrap;
   }
-  #audio-bar audio { flex: 1; min-width: 280px; height: 36px; }
+  #audio-bar #btn-play-pause { width: 38px; padding: 4px 0; font-size: 0.95rem; line-height: 1; }
+  #audio-bar .scrubber {
+    flex: 1;
+    min-width: 200px;
+    height: 10px;
+    background: #1a1510;
+    border: 1px solid #4a3f32;
+    border-radius: 5px;
+    position: relative;
+    cursor: pointer;
+  }
+  #audio-bar .scrubber-fill {
+    height: 100%;
+    background: #c9a86a;
+    border-radius: 4px;
+    width: 0;
+    pointer-events: none;
+  }
+  #audio-bar .scrubber-thumb {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translate(-50%, -50%);
+    width: 14px;
+    height: 14px;
+    background: #c9a86a;
+    border: 2px solid #2a2520;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  #audio-bar.no-audio .scrubber { opacity: 0.35; cursor: not-allowed; }
+  #audio-bar .scrubber-time {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.78rem;
+    color: #c9a86a;
+    font-variant-numeric: tabular-nums;
+    min-width: 7em;
+    text-align: center;
+    letter-spacing: 0.04em;
+  }
   #audio-bar .seek-controls { display: flex; gap: 4px; }
   #audio-bar button {
     padding: 4px 10px;
@@ -150,7 +206,7 @@
     letter-spacing: 0.04em;
   }
   #audio-bar button:hover:not(:disabled) { border-color: #c9a86a; color: #c9a86a; }
-  #audio-bar button:disabled { opacity: 0.3; cursor: not-allowed; }
+  #audio-bar button:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1) brightness(0.55); }
   #audio-bar button.primary { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
   #audio-bar button.primary:hover { background: #d8b878; border-color: #d8b878; color: #1a1510; }
   #audio-bar .speed-group { display: flex; gap: 0; align-items: center; }
@@ -164,10 +220,10 @@
 
   /* Editor */
   #editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .editor-stack { position: relative; flex: 1 1 0; min-height: 120px; display: flex; }
+  .editor-stack > textarea { flex: 1 1 0; min-height: 0; }
   #editor {
-    flex: 1 1 0;
-    min-height: 120px;
-    font-family: "Courier New", Courier, monospace;
+    font-family: "Courier Prime", "Courier New", ui-monospace, monospace;
     font-size: var(--editor-font-size, 14px);
     padding: 12px 16px;
     border: none;
@@ -177,8 +233,35 @@
     tab-size: 4;
     background: #fffaf0;
     color: #2a2520;
+    position: relative;
+    z-index: 0;
   }
   #editor.bold { font-weight: bold; }
+  .editor-overlay {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .editor-overlay .overlay-inner {
+    padding: 12px 16px;
+    font-family: "Courier Prime", "Courier New", ui-monospace, monospace;
+    font-size: var(--editor-font-size, 14px);
+    line-height: 1.55;
+    tab-size: 4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: transparent;
+    will-change: transform;
+  }
+  .editor-overlay .overlay-inner.bold { font-weight: bold; }
+  .editor-overlay .overlay-inner mark {
+    background: rgba(201, 168, 106, 0.55);
+    color: transparent;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(138, 106, 58, 0.6);
+  }
   body.dirty #editor { background: #fff3d6; }
   body.dirty #main { box-shadow: inset 3px 0 0 #8a6a3a; }
 
@@ -250,7 +333,12 @@
 </style>
 </head>
 <body>
-  <aside id="nav"><h1>Audio transcript <span class="progress" id="nav-progress"></span></h1></aside>
+  <aside id="nav">
+    <div id="nav-fixed">
+      <h1>Audio transcript <span class="progress" id="nav-progress"></span></h1>
+    </div>
+    <div id="nav-list"></div>
+  </aside>
 
   <section id="main">
     <header id="header">
@@ -262,8 +350,8 @@
       </div>
       <div class="controls">
         <span id="position">—</span>
-        <button id="btn-prev" title="Previous block (Ctrl+Shift+←)">‹ Prev</button>
-        <button id="btn-next" title="Next block (Ctrl+Shift+→)">Next ›</button>
+        <button id="btn-prev" title="Previous block">‹ Prev</button>
+        <button id="btn-next" title="Next block">Next ›</button>
       </div>
     </header>
 
@@ -273,7 +361,13 @@
         <button id="btn-back-3" title="Skip back 3s">−3s</button>
         <button id="btn-fwd-3" title="Skip forward 3s">+3s</button>
       </div>
-      <audio id="audio" controls preload="metadata"></audio>
+      <button id="btn-play-pause" title="Play/pause">▶</button>
+      <div class="scrubber" id="scrubber">
+        <div class="scrubber-fill" id="scrubber-fill"></div>
+        <div class="scrubber-thumb" id="scrubber-thumb"></div>
+      </div>
+      <span class="scrubber-time" id="scrubber-time">0:00 / 0:00</span>
+      <audio id="audio" preload="metadata" hidden></audio>
       <span class="label">Speed</span>
       <div class="speed-group" id="speed-group">
         <button data-speed="0.75">0.75×</button>
@@ -284,7 +378,10 @@
     </div>
 
     <div id="editor-wrap">
-      <textarea id="editor" spellcheck="false" wrap="soft"></textarea>
+      <div class="editor-stack">
+        <div id="editor-highlight" class="editor-overlay" hidden><div class="overlay-inner"></div></div>
+        <textarea id="editor" spellcheck="false" wrap="soft"></textarea>
+      </div>
       <div id="diff-pane" class="empty"></div>
     </div>
 
@@ -297,7 +394,7 @@
       <button id="font-smaller" title="Smaller text">A−</button>
       <span id="font-readout" title="Editor font size">14</span>
       <button id="font-larger" title="Larger text">A+</button>
-      <span class="hint">Ctrl+S commit · Ctrl+Shift+← / → prev/next · Ctrl+Shift+M mark · Ctrl+Shift+Space play · Ctrl+Shift+W swap</span>
+      <span class="hint">Ctrl+S commit · Ctrl+Shift+M mark · Ctrl+Shift+Space play · Ctrl+Shift+W swap</span>
       <button id="btn-mark-proofread" hidden title="Advance the >>>>> marker past this block (Ctrl+Shift+M)">Mark as proofread ▶</button>
     </div>
 
@@ -308,14 +405,21 @@
 <script>
 (() => {
 const $ = id => document.getElementById(id);
-const { renderUnifiedDiff } = window.ProofreadShared;
+const { renderUnifiedDiff, createSearch, highlightHTML } = window.ProofreadShared;
 
 let blocks = [];
 let currentIdx = -1;
 let currentBlock = null;
 let originalText = "";
 let pendingSeek = null;  // seconds to seek to once metadata loads
+let pendingPlay = false; // call audio.play() once metadata loads
 let lastLoadedAudio = "";
+let searchIndex = [];
+let search = null;
+let blockStart = 0;      // seconds in source file at which current block begins
+let blockEnd = null;     // seconds in source at which next block begins; null = use audio.duration
+let scrubbing = false;
+const AUTOPLAY_KEY = "audio_proofread.autoplay";
 
 async function api(url, opts) {
   const r = await fetch(url, opts || {});
@@ -363,6 +467,29 @@ function updateDirty() {
 
 async function init() {
   blocks = await api("/api/blocks");
+  searchIndex = await api("/api/search-index");
+  search = createSearch({
+    navRoot: $("nav-list"),
+    getIndex: () => searchIndex,
+    getCurrentId: () => currentBlock ? currentBlock.id : null,
+    onSelect: (id) => {
+      const i = blocks.findIndex(b => b.id === id);
+      if (i >= 0) selectBlockByIdx(i);
+    },
+    onQueryChanged: () => updateEditorHighlight(),
+  });
+  $("nav-fixed").appendChild(search.element);
+
+  const autoplayLabel = document.createElement("label");
+  autoplayLabel.className = "autoplay-toggle";
+  autoplayLabel.innerHTML = `<input type="checkbox" id="autoplay-toggle"> Autoplay on navigate`;
+  $("nav-fixed").appendChild(autoplayLabel);
+  const ap = $("autoplay-toggle");
+  ap.checked = localStorage.getItem(AUTOPLAY_KEY) === "1";
+  ap.addEventListener("change", () => {
+    localStorage.setItem(AUTOPLAY_KEY, ap.checked ? "1" : "0");
+  });
+
   renderNav();
   const hash = location.hash.slice(1);
   let idx = 0;
@@ -376,6 +503,11 @@ async function init() {
   await selectBlockByIdx(idx, /*force*/ true);
 }
 
+async function refreshSearchIndex() {
+  searchIndex = await api("/api/search-index");
+  if (search) search.refresh();
+}
+
 function renderNav() {
   const byClip = [];
   let cur = null;
@@ -386,9 +518,10 @@ function renderNav() {
     }
     cur.items.push({ ...b, idx: i });
   });
-  const nav = $("nav");
+  const list = $("nav-list");
+  list.innerHTML = "";
   const proofreadCount = blocks.filter(b => b.proofread).length;
-  nav.innerHTML = `<h1>Audio transcript <span class="progress">${proofreadCount} / ${blocks.length} done</span></h1>`;
+  $("nav-progress").textContent = `${proofreadCount} / ${blocks.length} done`;
 
   // Group clips by parent folder (recording session) for visual structure.
   let lastFolder = null;
@@ -400,7 +533,7 @@ function renderNav() {
       const sec = document.createElement("div");
       sec.className = "clip-section";
       sec.textContent = folder || "(root)";
-      nav.appendChild(sec);
+      list.appendChild(sec);
       lastFolder = folder;
     }
     const div = document.createElement("div");
@@ -411,6 +544,7 @@ function renderNav() {
     group.items.forEach(b => {
       const li = document.createElement("li");
       li.dataset.idx = b.idx;
+      li.dataset.sid = b.id;
       const classes = [];
       if (b.proofread) classes.push("proofread");
       if (b.is_next_to_proofread) classes.push("next-up");
@@ -424,8 +558,9 @@ function renderNav() {
       li.addEventListener("click", () => selectBlockByIdx(b.idx));
       ul.appendChild(li);
     });
-    nav.appendChild(div);
+    list.appendChild(div);
   });
+  if (search) search.applyHighlights();
   updateNavActive();
 }
 
@@ -437,11 +572,12 @@ function escAttr(s) {
 }
 
 function updateNavActive() {
-  document.querySelectorAll("#nav li").forEach(li => {
+  document.querySelectorAll("#nav-list li").forEach(li => {
     li.classList.toggle("active", Number(li.dataset.idx) === currentIdx);
   });
-  const active = document.querySelector("#nav li.active");
+  const active = document.querySelector("#nav-list li.active");
   if (active) active.scrollIntoView({ block: "nearest" });
+  if (search) search.update();
 }
 
 async function selectBlockByIdx(idx, force) {
@@ -468,44 +604,93 @@ async function selectBlockByIdx(idx, force) {
   updateDirty();
   updateDiff();
   updateNavActive();
+  updateEditorHighlight();
+}
+
+function autoplayEnabled() {
+  const el = $("autoplay-toggle");
+  return !!(el && el.checked);
+}
+
+function computeBlockEnd(idx) {
+  if (idx < 0 || idx >= blocks.length) return null;
+  const cur = blocks[idx];
+  if (!cur || !cur.clip) return null;
+  for (let i = idx + 1; i < blocks.length; i++) {
+    if (blocks[i].clip !== cur.clip) break;
+    if (blocks[i].start_seconds != null) return blocks[i].start_seconds;
+  }
+  return null; // last block in clip — fall back to audio.duration when known
+}
+
+function blockDuration() {
+  const audio = $("audio");
+  const end = blockEnd != null ? blockEnd : (audio.duration || 0);
+  return Math.max(0, end - blockStart);
 }
 
 function updateAudioForBlock() {
   const audio = $("audio");
   const bar = $("audio-bar");
+  blockStart = (currentBlock && currentBlock.start_seconds) || 0;
+  blockEnd = computeBlockEnd(currentIdx);
+
   const audioUrl = currentBlock && currentBlock.clip ? currentBlock.audio_url : "";
+  const playbackBtns = [
+    $("btn-play-from-start"), $("btn-back-3"), $("btn-fwd-3"),
+    $("btn-play-pause"),
+    ...document.querySelectorAll("#speed-group button"),
+  ];
   if (!audioUrl) {
     bar.classList.add("no-audio");
     audio.removeAttribute("src");
     audio.load();
-    $("btn-play-from-start").disabled = true;
-    $("btn-back-3").disabled = true;
-    $("btn-fwd-3").disabled = true;
+    playbackBtns.forEach(b => { b.disabled = true; });
     if (!bar.querySelector(".placeholder")) {
       const span = document.createElement("span");
       span.className = "placeholder";
       span.textContent = "(no audio for this block)";
       bar.insertBefore(span, audio);
     }
+    pendingSeek = null;
+    pendingPlay = false;
+    updateAudioPosition();
     return;
   }
   bar.classList.remove("no-audio");
   const placeholder = bar.querySelector(".placeholder");
   if (placeholder) placeholder.remove();
-  $("btn-play-from-start").disabled = false;
-  $("btn-back-3").disabled = false;
-  $("btn-fwd-3").disabled = false;
+  playbackBtns.forEach(b => { b.disabled = false; });
 
-  const target = currentBlock.start_seconds || 0;
+  const target = blockStart;
+  const shouldPlay = autoplayEnabled();
   if (audioUrl !== lastLoadedAudio) {
     pendingSeek = target;
+    pendingPlay = shouldPlay;
     audio.src = audioUrl;
     audio.load();
     lastLoadedAudio = audioUrl;
   } else {
-    // Same clip — just seek.
     try { audio.currentTime = target; } catch { pendingSeek = target; }
+    if (shouldPlay) audio.play().catch(() => {});
   }
+  updateAudioPosition();
+}
+
+function updateAudioPosition() {
+  const audio = $("audio");
+  const dur = blockDuration();
+  if (dur <= 0 || !audio.src) {
+    $("scrubber-fill").style.width = "0%";
+    $("scrubber-thumb").style.left = "0%";
+    $("scrubber-time").textContent = "0:00 / 0:00";
+    return;
+  }
+  const rel = Math.max(0, Math.min(dur, (audio.currentTime || 0) - blockStart));
+  const pct = (rel / dur) * 100;
+  $("scrubber-fill").style.width = `${pct}%`;
+  $("scrubber-thumb").style.left = `${pct}%`;
+  $("scrubber-time").textContent = `${fmtTs(Math.floor(rel))} / ${fmtTs(Math.floor(dur))}`;
 }
 
 function playFromStart() {
@@ -525,7 +710,27 @@ $("audio").addEventListener("loadedmetadata", () => {
     try { $("audio").currentTime = pendingSeek; } catch {}
     pendingSeek = null;
   }
+  if (pendingPlay) {
+    pendingPlay = false;
+    $("audio").play().catch(() => {});
+  }
+  updateAudioPosition();
 });
+$("audio").addEventListener("durationchange", updateAudioPosition);
+$("audio").addEventListener("timeupdate", () => {
+  const audio = $("audio");
+  // Constrain playback to the current block. When the playhead crosses
+  // blockEnd (or audio.duration if blockEnd is unknown), pause and snap to
+  // the boundary so the seek bar UI stays inside [blockStart, blockEnd].
+  const limit = blockEnd != null ? blockEnd : (Number.isFinite(audio.duration) ? audio.duration : null);
+  if (limit != null && audio.currentTime >= limit && !audio.paused) {
+    audio.pause();
+    try { audio.currentTime = limit; } catch {}
+  }
+  if (!scrubbing) updateAudioPosition();
+});
+$("audio").addEventListener("play", () => { $("btn-play-pause").textContent = "⏸"; });
+$("audio").addEventListener("pause", () => { $("btn-play-pause").textContent = "▶"; });
 
 // ---- diff ----
 function updateDiff() {
@@ -562,6 +767,33 @@ function swapSpeakerAtCursor() {
   updateDiff();
 }
 
+// ---- search-hit overlay ----
+// Mirrors the textarea contents in a non-interactive layer behind it, with
+// <mark>-wrapped match runs. Visible only when search is active and the
+// textarea isn't focused — highlighting is a display-mode aid only.
+function updateEditorHighlight() {
+  const overlay = $("editor-highlight");
+  if (!overlay) return;
+  const inner = overlay.querySelector(".overlay-inner");
+  const editor = $("editor");
+  const q = search ? search.getQuery() : "";
+  const focused = document.activeElement === editor;
+  const shouldShow = !!q && !focused;
+  overlay.hidden = !shouldShow;
+  if (!shouldShow) return;
+  inner.classList.toggle("bold", editor.classList.contains("bold"));
+  inner.innerHTML = highlightHTML(editor.value, q);
+  inner.style.transform = `translate(${-editor.scrollLeft}px, ${-editor.scrollTop}px)`;
+}
+
+$("editor").addEventListener("focus", updateEditorHighlight);
+$("editor").addEventListener("blur", updateEditorHighlight);
+$("editor").addEventListener("scroll", () => {
+  const inner = $("editor-highlight").querySelector(".overlay-inner");
+  const editor = $("editor");
+  inner.style.transform = `translate(${-editor.scrollLeft}px, ${-editor.scrollTop}px)`;
+});
+
 // ---- events ----
 $("editor").addEventListener("input", () => {
   updateDirty();
@@ -583,6 +815,7 @@ $("btn-commit").addEventListener("click", async () => {
     currentBlock.proofread = updated.proofread;
     currentBlock.is_next_to_proofread = updated.is_next_to_proofread;
   }
+  await refreshSearchIndex();
   renderNav();
   updateDirty();
   updateDiff();
@@ -605,6 +838,7 @@ $("btn-mark-proofread").addEventListener("click", async () => {
   }
   const data = await r.json();
   blocks = data.blocks;
+  await refreshSearchIndex();
   renderNav();
   const nextIdx = currentIdx + 1;
   if (nextIdx < blocks.length) await selectBlockByIdx(nextIdx, /*force*/ true);
@@ -618,12 +852,55 @@ $("btn-play-from-start").addEventListener("click", playFromStart);
 $("btn-back-3").addEventListener("click", () => {
   const a = $("audio");
   if (!a.src) return;
-  try { a.currentTime = Math.max(0, a.currentTime - 3); } catch {}
+  try { a.currentTime = Math.max(blockStart, a.currentTime - 3); } catch {}
 });
 $("btn-fwd-3").addEventListener("click", () => {
   const a = $("audio");
   if (!a.src) return;
-  try { a.currentTime = a.currentTime + 3; } catch {}
+  const limit = blockEnd != null ? blockEnd : (Number.isFinite(a.duration) ? a.duration : Infinity);
+  try { a.currentTime = Math.min(limit, a.currentTime + 3); } catch {}
+});
+
+$("btn-play-pause").addEventListener("click", () => {
+  const audio = $("audio");
+  if (!audio.src) return;
+  if (audio.paused) {
+    const limit = blockEnd != null ? blockEnd : (Number.isFinite(audio.duration) ? audio.duration : Infinity);
+    if (audio.currentTime < blockStart || audio.currentTime >= limit) {
+      try { audio.currentTime = blockStart; } catch {}
+    }
+    audio.play().catch(() => {});
+  } else {
+    audio.pause();
+  }
+});
+
+function seekToScrubber(e) {
+  const audio = $("audio");
+  if (!audio.src) return;
+  const sc = $("scrubber");
+  const rect = sc.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const dur = blockDuration();
+  if (dur <= 0) return;
+  try { audio.currentTime = blockStart + ratio * dur; } catch {}
+  updateAudioPosition();
+}
+$("scrubber").addEventListener("mousedown", e => {
+  if (!$("audio").src) return;
+  scrubbing = true;
+  document.body.classList.add("scrubbing");
+  seekToScrubber(e);
+  e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (scrubbing) seekToScrubber(e);
+});
+window.addEventListener("mouseup", () => {
+  if (scrubbing) {
+    scrubbing = false;
+    document.body.classList.remove("scrubbing");
+  }
 });
 
 // Speed buttons.
@@ -660,6 +937,7 @@ function applyBold(on) {
   $("editor").classList.toggle("bold", on);
   $("btn-bold").classList.toggle("active", on);
   localStorage.setItem(BOLD_KEY, on ? "1" : "0");
+  updateEditorHighlight();
 }
 applyBold(localStorage.getItem(BOLD_KEY) === "1");
 $("btn-bold").addEventListener("click", () => applyBold(!$("editor").classList.contains("bold")));
@@ -710,14 +988,6 @@ document.addEventListener("keydown", e => {
   if (isMod && e.key === "s") {
     e.preventDefault();
     if (isDirty()) $("btn-commit").click();
-  } else if (isMod && e.shiftKey && e.key === "ArrowLeft") {
-    e.preventDefault();
-    if (!isDirty()) selectBlockByIdx(currentIdx - 1);
-    else alert("Commit or discard first.");
-  } else if (isMod && e.shiftKey && e.key === "ArrowRight") {
-    e.preventDefault();
-    if (!isDirty()) selectBlockByIdx(currentIdx + 1);
-    else alert("Commit or discard first.");
   } else if (isMod && e.shiftKey && (e.key === "M" || e.key === "m")) {
     e.preventDefault();
     const btn = $("btn-mark-proofread");
