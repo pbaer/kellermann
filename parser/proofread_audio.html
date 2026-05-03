@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Audio Proof-Listener</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100vh; font-family: Georgia, "Times New Roman", serif; overflow: hidden; color: #2a2520; background: #f4f1ea; }
+  body { display: grid; grid-template-columns: var(--nav-width, 320px) 1fr; grid-template-rows: 100vh; }
+  body.resizing { cursor: col-resize; user-select: none; }
+  body.resizing * { user-select: none !important; }
+
+  button { font-family: inherit; }
+
+  /* Nav */
+  #nav { overflow-y: auto; border-right: 1px solid #d9cfb8; background: #efe7d4; }
+  #nav h1 {
+    margin: 0;
+    padding: 10px 14px;
+    background: #2a2520;
+    color: #f4f1ea;
+    border-bottom: 3px solid #8a6a3a;
+    font-size: 0.95rem;
+    font-weight: normal;
+    letter-spacing: 0.04em;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  #nav h1 .progress { color: #c9a86a; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  #nav .clip { border-bottom: 1px solid #d9cfb8; }
+  #nav .clip-header {
+    padding: 8px 14px;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    color: #8a6a3a;
+    cursor: pointer;
+    user-select: none;
+    background: #efe7d4;
+    border-bottom: 1px solid #e0d5bb;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+  }
+  #nav .clip-header .clip-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #nav .clip-header:hover { background: #e8dcc3; }
+  #nav .clip-header .count { color: #6a5a3a; letter-spacing: 0.04em; flex-shrink: 0; }
+  #nav .clip-section {
+    padding: 4px 14px 4px 14px;
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6a5a3a;
+    background: #e8dcc3;
+    border-top: 1px solid #d9cfb8;
+    border-bottom: 1px solid #d9cfb8;
+    font-weight: bold;
+  }
+  #nav ul { list-style: none; padding: 0; margin: 0; background: #f9f5ec; }
+  #nav li {
+    padding: 5px 14px 5px 18px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 6px;
+    align-items: baseline;
+    border-left: 3px solid transparent;
+    position: relative;
+    color: #3a322a;
+  }
+  #nav li + li { border-top: 1px solid #efe7d4; }
+  #nav li:hover { background: rgba(201, 168, 106, 0.18); }
+  #nav li.active { background: rgba(201, 168, 106, 0.32); border-left-color: #c9a86a; color: #2a2520; }
+  #nav li.proofread { color: #8a7a5a; }
+  #nav li.proofread::after { content: "✓"; position: absolute; right: 10px; color: #6b7a3a; font-weight: bold; font-size: 0.72rem; }
+  #nav li.next-up { border-left-color: #c9a86a; background: rgba(201, 168, 106, 0.22); color: #2a2520; }
+  #nav li.next-up::after { content: "▶"; position: absolute; right: 10px; color: #8a6a3a; font-size: 0.7rem; }
+  #nav li .ts { font-variant-numeric: tabular-nums; color: #6a5a3a; font-family: "Courier New", Courier, monospace; font-size: 0.74rem; }
+  #nav li .text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 16px; }
+  #nav li.no-ts .ts { color: #b8a888; font-style: italic; }
+
+  /* Main */
+  #main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #fffaf0; position: relative; }
+  #splitter { position: absolute; top: 0; bottom: 0; left: -3px; width: 6px; cursor: col-resize; z-index: 10; background: transparent; }
+  #splitter:hover, body.resizing #splitter { background: rgba(201, 168, 106, 0.55); }
+
+  #header {
+    padding: 10px 14px;
+    border-bottom: 1px solid #d9cfb8;
+    background: #efe7d4;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  #header .title { font-size: 0.88rem; color: #3a322a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  #header .title strong {
+    font-family: "Courier New", Courier, monospace;
+    color: #8a6a3a;
+    font-weight: bold;
+    letter-spacing: 0.02em;
+    margin-right: 6px;
+  }
+  #header .title .clip-name { color: #6a5a3a; font-style: italic; font-size: 0.82rem; }
+  #header .title .ts { font-family: "Courier New", Courier, monospace; color: #2a2520; margin-right: 8px; font-variant-numeric: tabular-nums; }
+  #header .title .proofread-dot { color: #6b7a3a; margin-right: 4px; }
+  #header .controls { display: flex; gap: 6px; align-items: center; }
+  #header .controls button {
+    padding: 3px 12px 4px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid #c9a86a;
+    border-radius: 2px;
+    color: #4a3f32;
+    font-family: inherit;
+  }
+  #header .controls button:hover:not(:disabled) { background: rgba(201, 168, 106, 0.18); color: #2a2520; }
+  #header .controls button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #c9bfa3; }
+  #position { font-size: 0.72rem; letter-spacing: 0.06em; color: #6a5a3a; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; }
+
+  /* Audio bar */
+  #audio-bar {
+    padding: 10px 14px;
+    background: #2a2520;
+    color: #c9a86a;
+    border-bottom: 1px solid #4a3f32;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  #audio-bar audio { flex: 1; min-width: 280px; height: 36px; }
+  #audio-bar .seek-controls { display: flex; gap: 4px; }
+  #audio-bar button {
+    padding: 4px 10px;
+    cursor: pointer;
+    background: transparent;
+    color: #f4f1ea;
+    border: 1px solid #4a3f32;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+  }
+  #audio-bar button:hover:not(:disabled) { border-color: #c9a86a; color: #c9a86a; }
+  #audio-bar button:disabled { opacity: 0.3; cursor: not-allowed; }
+  #audio-bar button.primary { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
+  #audio-bar button.primary:hover { background: #d8b878; border-color: #d8b878; color: #1a1510; }
+  #audio-bar .speed-group { display: flex; gap: 0; align-items: center; }
+  #audio-bar .speed-group button { border-radius: 0; border-right: none; padding: 4px 8px; }
+  #audio-bar .speed-group button:first-child { border-radius: 2px 0 0 2px; }
+  #audio-bar .speed-group button:last-child { border-right: 1px solid #4a3f32; border-radius: 0 2px 2px 0; }
+  #audio-bar .speed-group button.active { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
+  #audio-bar .label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8a7a5a; }
+  #audio-bar.no-audio { background: #4a3f32; color: #8a7a5a; }
+  #audio-bar.no-audio .placeholder { font-style: italic; font-size: 0.82rem; padding: 6px 0; }
+
+  /* Editor */
+  #editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  #editor {
+    flex: 1 1 0;
+    min-height: 120px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: var(--editor-font-size, 14px);
+    padding: 12px 16px;
+    border: none;
+    outline: none;
+    resize: none;
+    line-height: 1.55;
+    tab-size: 4;
+    background: #fffaf0;
+    color: #2a2520;
+  }
+  #editor.bold { font-weight: bold; }
+  body.dirty #editor { background: #fff3d6; }
+  body.dirty #main { box-shadow: inset 3px 0 0 #8a6a3a; }
+
+  #diff-pane {
+    flex: 0 0 auto;
+    max-height: 45vh;
+    min-height: 60px;
+    overflow: auto;
+    border-top: 1px solid #d9cfb8;
+    background: #f9f5ec;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.82rem;
+    padding: 4px 0;
+  }
+  #diff-pane.empty { display: none; }
+  #diff-pane .line { padding: 1px 14px; white-space: pre-wrap; word-break: break-word; }
+  #diff-pane .line.ctx { color: #8a7a5a; }
+  #diff-pane .line.add { background: #e5ead0; color: #3a4a1a; }
+  #diff-pane .line.del { background: #ead7cf; color: #6a1a1a; }
+  #diff-pane .line.add .chg { background: #b9c988; color: #1a2a0a; padding: 0 1px; border-radius: 2px; }
+  #diff-pane .line.del .chg { background: #d6a697; color: #3a0a0a; padding: 0 1px; border-radius: 2px; text-decoration: none; }
+  #diff-pane .hdr {
+    padding: 4px 14px;
+    color: #8a6a3a;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: #efe7d4;
+    border-top: 1px solid #e0d5bb;
+    border-bottom: 1px solid #e0d5bb;
+  }
+
+  #buttons {
+    padding: 10px 14px;
+    border-top: 1px solid #d9cfb8;
+    background: #efe7d4;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #buttons button {
+    padding: 4px 14px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border: 1px solid #c9a86a;
+    background: transparent;
+    border-radius: 2px;
+    color: #4a3f32;
+    letter-spacing: 0.03em;
+    font-family: inherit;
+  }
+  #buttons button:hover:not(:disabled) { background: rgba(201, 168, 106, 0.18); color: #2a2520; }
+  #buttons button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #c9bfa3; }
+  #buttons #btn-commit:not(:disabled) { background: #2a2520; color: #c9a86a; border-color: #2a2520; font-weight: bold; }
+  #buttons #btn-commit:not(:disabled):hover { background: #3a322a; color: #f4f1ea; }
+  #buttons #btn-discard:not(:disabled) { background: transparent; color: #6a1a1a; border-color: #8a4a3a; }
+  #buttons #btn-discard:not(:disabled):hover { background: rgba(138, 74, 58, 0.18); color: #4a0a0a; }
+  #buttons #btn-mark-proofread { margin-left: auto; background: #c9a86a; color: #2a2520; border-color: #8a6a3a; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.72rem; padding: 5px 14px; }
+  #buttons #btn-mark-proofread:hover { background: #d8b878; color: #2a2520; }
+  #buttons #btn-mark-proofread[hidden] { display: none; }
+  #buttons .hint { margin-left: 6px; font-size: 0.68rem; letter-spacing: 0.04em; color: #8a7a5a; font-style: italic; }
+  #buttons #btn-bold { font-family: "Courier New", Courier, monospace; font-weight: bold; width: 30px; padding: 4px 0; }
+  #buttons #btn-bold.active { background: #2a2520; color: #c9a86a; border-color: #2a2520; }
+  #buttons #btn-swap-speaker { font-size: 0.72rem; letter-spacing: 0.04em; padding: 4px 10px; }
+  #buttons .sep { color: #c9bfa3; padding: 0 2px; }
+  #buttons #font-smaller, #buttons #font-larger { padding: 4px 10px; font-size: 0.78rem; }
+  #buttons #font-readout { font-variant-numeric: tabular-nums; font-size: 0.78rem; color: #6a5a3a; min-width: 1.6em; text-align: center; letter-spacing: 0.04em; }
+</style>
+</head>
+<body>
+  <aside id="nav"><h1>Audio transcript <span class="progress" id="nav-progress"></span></h1></aside>
+
+  <section id="main">
+    <header id="header">
+      <div class="title">
+        <span class="proofread-dot" id="lh-proofread" hidden>✓</span>
+        <strong id="lh-id">—</strong>
+        <span class="ts" id="lh-ts"></span>
+        <span class="clip-name" id="lh-clip">—</span>
+      </div>
+      <div class="controls">
+        <span id="position">—</span>
+        <button id="btn-prev" title="Previous block (Ctrl+Shift+←)">‹ Prev</button>
+        <button id="btn-next" title="Next block (Ctrl+Shift+→)">Next ›</button>
+      </div>
+    </header>
+
+    <div id="audio-bar">
+      <button id="btn-play-from-start" class="primary" title="Play from block start (Ctrl+Shift+Space)">▶ Play from start</button>
+      <div class="seek-controls">
+        <button id="btn-back-3" title="Skip back 3s">−3s</button>
+        <button id="btn-fwd-3" title="Skip forward 3s">+3s</button>
+      </div>
+      <audio id="audio" controls preload="metadata"></audio>
+      <span class="label">Speed</span>
+      <div class="speed-group" id="speed-group">
+        <button data-speed="0.75">0.75×</button>
+        <button data-speed="1" class="active">1×</button>
+        <button data-speed="1.25">1.25×</button>
+        <button data-speed="1.5">1.5×</button>
+      </div>
+    </div>
+
+    <div id="editor-wrap">
+      <textarea id="editor" spellcheck="false" wrap="soft"></textarea>
+      <div id="diff-pane" class="empty"></div>
+    </div>
+
+    <div id="buttons">
+      <button id="btn-commit" disabled title="Commit changes (Ctrl+S)">Commit</button>
+      <button id="btn-discard" disabled>Discard</button>
+      <span class="sep">·</span>
+      <button id="btn-swap-speaker" title="Swap [Wilhelm] ↔ [Tilman] on the line containing the cursor (Ctrl+Shift+W)">Swap speaker</button>
+      <button id="btn-bold" title="Bold editor text">B</button>
+      <button id="font-smaller" title="Smaller text">A−</button>
+      <span id="font-readout" title="Editor font size">14</span>
+      <button id="font-larger" title="Larger text">A+</button>
+      <span class="hint">Ctrl+S commit · Ctrl+Shift+← / → prev/next · Ctrl+Shift+M mark · Ctrl+Shift+Space play · Ctrl+Shift+W swap</span>
+      <button id="btn-mark-proofread" hidden title="Advance the >>>>> marker past this block (Ctrl+Shift+M)">Mark as proofread ▶</button>
+    </div>
+
+    <div id="splitter" title="Drag to resize"></div>
+  </section>
+
+<script src="/proofread_shared.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const { renderUnifiedDiff } = window.ProofreadShared;
+
+let blocks = [];
+let currentIdx = -1;
+let currentBlock = null;
+let originalText = "";
+let pendingSeek = null;  // seconds to seek to once metadata loads
+let lastLoadedAudio = "";
+
+async function api(url, opts) {
+  const r = await fetch(url, opts || {});
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return r.json();
+}
+
+function isDirty() {
+  return currentBlock && $("editor").value !== originalText;
+}
+
+function fmtTs(secs) {
+  if (secs == null) return "—";
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function shortenClip(clip) {
+  if (!clip) return "(transcript-level)";
+  // "Erinnerungen - Opa I (Edison-June 10, 1982)/01 Kriegspfad 1941.mp3"
+  // → "Opa I · 01 Kriegspfad 1941"
+  const slash = clip.lastIndexOf("/");
+  const folder = slash >= 0 ? clip.slice(0, slash) : "";
+  const file = slash >= 0 ? clip.slice(slash + 1) : clip;
+  const fileShort = file.replace(/\.mp3$/i, "");
+  const folderShort = folder.replace(/^Erinnerungen\s*-\s*/, "")
+                            .replace(/\s*\(.*?\)\s*$/, "")
+                            .trim();
+  return folderShort ? `${folderShort} · ${fileShort}` : fileShort;
+}
+
+function updateDirty() {
+  const dirty = isDirty();
+  document.body.classList.toggle("dirty", !!dirty);
+  $("btn-commit").disabled = !dirty;
+  $("btn-discard").disabled = !dirty;
+  $("btn-prev").disabled = !!dirty || currentIdx <= 0;
+  $("btn-next").disabled = !!dirty || currentIdx >= blocks.length - 1;
+  const mp = $("btn-mark-proofread");
+  const eligible = currentBlock && currentBlock.is_next_to_proofread;
+  mp.hidden = !eligible;
+  mp.disabled = !!dirty;
+}
+
+async function init() {
+  blocks = await api("/api/blocks");
+  renderNav();
+  const hash = location.hash.slice(1);
+  let idx = 0;
+  if (hash) {
+    const i = blocks.findIndex(b => b.id === hash);
+    if (i >= 0) idx = i;
+  } else {
+    const next = blocks.findIndex(b => b.is_next_to_proofread);
+    if (next >= 0) idx = next;
+  }
+  await selectBlockByIdx(idx, /*force*/ true);
+}
+
+function renderNav() {
+  const byClip = [];
+  let cur = null;
+  blocks.forEach((b, i) => {
+    if (!cur || cur.clip !== b.clip) {
+      cur = { clip: b.clip, items: [] };
+      byClip.push(cur);
+    }
+    cur.items.push({ ...b, idx: i });
+  });
+  const nav = $("nav");
+  const proofreadCount = blocks.filter(b => b.proofread).length;
+  nav.innerHTML = `<h1>Audio transcript <span class="progress">${proofreadCount} / ${blocks.length} done</span></h1>`;
+
+  // Group clips by parent folder (recording session) for visual structure.
+  let lastFolder = null;
+  byClip.forEach(group => {
+    const clip = group.clip || "";
+    const slash = clip.lastIndexOf("/");
+    const folder = slash >= 0 ? clip.slice(0, slash) : "";
+    if (folder !== lastFolder) {
+      const sec = document.createElement("div");
+      sec.className = "clip-section";
+      sec.textContent = folder || "(root)";
+      nav.appendChild(sec);
+      lastFolder = folder;
+    }
+    const div = document.createElement("div");
+    div.className = "clip";
+    const fileShort = (slash >= 0 ? clip.slice(slash + 1) : clip).replace(/\.mp3$/i, "") || "(no clip)";
+    div.innerHTML = `<div class="clip-header"><span class="clip-title" title="${escAttr(clip || "(transcript-level)")}">${escHtml(fileShort)}</span><span class="count">${group.items.length}</span></div><ul></ul>`;
+    const ul = div.querySelector("ul");
+    group.items.forEach(b => {
+      const li = document.createElement("li");
+      li.dataset.idx = b.idx;
+      const classes = [];
+      if (b.proofread) classes.push("proofread");
+      if (b.is_next_to_proofread) classes.push("next-up");
+      if (b.start_seconds == null) classes.push("no-ts");
+      li.className = classes.join(" ");
+      const tsLabel = b.start_seconds == null ? "—" : fmtTs(b.start_seconds);
+      li.innerHTML =
+        `<span class="ts">${tsLabel}</span>` +
+        `<span class="text">${escHtml(b.preview || "")}</span>`;
+      li.title = b.preview || "";
+      li.addEventListener("click", () => selectBlockByIdx(b.idx));
+      ul.appendChild(li);
+    });
+    nav.appendChild(div);
+  });
+  updateNavActive();
+}
+
+function escHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+function escAttr(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function updateNavActive() {
+  document.querySelectorAll("#nav li").forEach(li => {
+    li.classList.toggle("active", Number(li.dataset.idx) === currentIdx);
+  });
+  const active = document.querySelector("#nav li.active");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+async function selectBlockByIdx(idx, force) {
+  if (!force && isDirty()) {
+    alert("You have unsaved changes. Commit or discard them first.");
+    return;
+  }
+  if (idx < 0 || idx >= blocks.length) return;
+  currentIdx = idx;
+  const bid = blocks[idx].id;
+  currentBlock = await api(`/api/block/${bid}`);
+  originalText = currentBlock.raw_text;
+  $("editor").value = originalText;
+
+  $("lh-id").textContent = currentBlock.id;
+  $("lh-ts").textContent = currentBlock.start_seconds == null ? "" : `[${fmtTs(currentBlock.start_seconds)}]`;
+  $("lh-clip").textContent = shortenClip(currentBlock.clip);
+  $("lh-clip").title = currentBlock.clip || "";
+  $("lh-proofread").hidden = !currentBlock.proofread;
+  $("position").textContent = `${idx + 1} / ${blocks.length}`;
+  location.hash = bid;
+
+  updateAudioForBlock();
+  updateDirty();
+  updateDiff();
+  updateNavActive();
+}
+
+function updateAudioForBlock() {
+  const audio = $("audio");
+  const bar = $("audio-bar");
+  const audioUrl = currentBlock && currentBlock.clip ? currentBlock.audio_url : "";
+  if (!audioUrl) {
+    bar.classList.add("no-audio");
+    audio.removeAttribute("src");
+    audio.load();
+    $("btn-play-from-start").disabled = true;
+    $("btn-back-3").disabled = true;
+    $("btn-fwd-3").disabled = true;
+    if (!bar.querySelector(".placeholder")) {
+      const span = document.createElement("span");
+      span.className = "placeholder";
+      span.textContent = "(no audio for this block)";
+      bar.insertBefore(span, audio);
+    }
+    return;
+  }
+  bar.classList.remove("no-audio");
+  const placeholder = bar.querySelector(".placeholder");
+  if (placeholder) placeholder.remove();
+  $("btn-play-from-start").disabled = false;
+  $("btn-back-3").disabled = false;
+  $("btn-fwd-3").disabled = false;
+
+  const target = currentBlock.start_seconds || 0;
+  if (audioUrl !== lastLoadedAudio) {
+    pendingSeek = target;
+    audio.src = audioUrl;
+    audio.load();
+    lastLoadedAudio = audioUrl;
+  } else {
+    // Same clip — just seek.
+    try { audio.currentTime = target; } catch { pendingSeek = target; }
+  }
+}
+
+function playFromStart() {
+  if (!currentBlock || !currentBlock.clip) return;
+  const audio = $("audio");
+  const target = currentBlock.start_seconds || 0;
+  const seek = () => {
+    try { audio.currentTime = target; } catch {}
+    audio.play().catch(() => {});
+  };
+  if (audio.readyState >= 1) seek();
+  else { pendingSeek = target; audio.addEventListener("loadedmetadata", () => audio.play().catch(() => {}), { once: true }); }
+}
+
+$("audio").addEventListener("loadedmetadata", () => {
+  if (pendingSeek != null) {
+    try { $("audio").currentTime = pendingSeek; } catch {}
+    pendingSeek = null;
+  }
+});
+
+// ---- diff ----
+function updateDiff() {
+  const diff = $("diff-pane");
+  if (!isDirty()) {
+    diff.classList.add("empty");
+    diff.innerHTML = "";
+    return;
+  }
+  diff.classList.remove("empty");
+  const a = originalText.split("\n");
+  const b = $("editor").value.split("\n");
+  diff.innerHTML = renderUnifiedDiff(a, b);
+}
+
+// ---- swap speaker on cursor line ----
+function swapSpeakerAtCursor() {
+  const ed = $("editor");
+  const val = ed.value;
+  const pos = ed.selectionStart;
+  // Find line bounds containing cursor.
+  let ls = val.lastIndexOf("\n", pos - 1) + 1;
+  let le = val.indexOf("\n", pos);
+  if (le === -1) le = val.length;
+  const line = val.slice(ls, le);
+  const swapped = line
+    .replace(/\[Wilhelm\]/g, "\x00")
+    .replace(/\[Tilman\]/g, "[Wilhelm]")
+    .replace(/\x00/g, "[Tilman]");
+  if (swapped === line) return;
+  ed.value = val.slice(0, ls) + swapped + val.slice(le);
+  ed.setSelectionRange(pos, pos);
+  updateDirty();
+  updateDiff();
+}
+
+// ---- events ----
+$("editor").addEventListener("input", () => {
+  updateDirty();
+  updateDiff();
+});
+
+$("btn-commit").addEventListener("click", async () => {
+  const r = await fetch(`/api/block/${currentBlock.id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: $("editor").value }),
+  });
+  if (!r.ok) { alert("Save failed"); return; }
+  const data = await r.json();
+  originalText = $("editor").value;
+  blocks = data.blocks;
+  const updated = blocks[currentIdx];
+  if (updated) {
+    currentBlock.proofread = updated.proofread;
+    currentBlock.is_next_to_proofread = updated.is_next_to_proofread;
+  }
+  renderNav();
+  updateDirty();
+  updateDiff();
+  $("lh-proofread").hidden = !currentBlock.proofread;
+});
+
+$("btn-discard").addEventListener("click", () => {
+  $("editor").value = originalText;
+  updateDirty();
+  updateDiff();
+});
+
+$("btn-mark-proofread").addEventListener("click", async () => {
+  if (isDirty()) { alert("Commit or discard first."); return; }
+  const r = await fetch(`/api/mark-proofread/${currentBlock.id}`, { method: "POST" });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    alert("Mark failed: " + (err.error || r.status));
+    return;
+  }
+  const data = await r.json();
+  blocks = data.blocks;
+  renderNav();
+  const nextIdx = currentIdx + 1;
+  if (nextIdx < blocks.length) await selectBlockByIdx(nextIdx, /*force*/ true);
+  else await selectBlockByIdx(currentIdx, /*force*/ true);
+});
+
+$("btn-prev").addEventListener("click", () => selectBlockByIdx(currentIdx - 1));
+$("btn-next").addEventListener("click", () => selectBlockByIdx(currentIdx + 1));
+
+$("btn-play-from-start").addEventListener("click", playFromStart);
+$("btn-back-3").addEventListener("click", () => {
+  const a = $("audio");
+  if (!a.src) return;
+  try { a.currentTime = Math.max(0, a.currentTime - 3); } catch {}
+});
+$("btn-fwd-3").addEventListener("click", () => {
+  const a = $("audio");
+  if (!a.src) return;
+  try { a.currentTime = a.currentTime + 3; } catch {}
+});
+
+// Speed buttons.
+$("speed-group").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-speed]");
+  if (!btn) return;
+  const speed = Number(btn.dataset.speed);
+  $("audio").playbackRate = speed;
+  localStorage.setItem("audio.speed", String(speed));
+  document.querySelectorAll("#speed-group button").forEach(b =>
+    b.classList.toggle("active", b === btn));
+});
+{
+  const saved = Number(localStorage.getItem("audio.speed")) || 1;
+  $("audio").playbackRate = saved;
+  document.querySelectorAll("#speed-group button").forEach(b =>
+    b.classList.toggle("active", Number(b.dataset.speed) === saved));
+}
+$("audio").addEventListener("ratechange", () => {
+  // Keep in sync if browser changes rate via its own controls.
+  const r = $("audio").playbackRate;
+  document.querySelectorAll("#speed-group button").forEach(b =>
+    b.classList.toggle("active", Math.abs(Number(b.dataset.speed) - r) < 0.01));
+});
+
+$("btn-swap-speaker").addEventListener("click", () => {
+  swapSpeakerAtCursor();
+  $("editor").focus();
+});
+
+// Bold toggle for the editor text — persisted.
+const BOLD_KEY = "audio_proofread.bold";
+function applyBold(on) {
+  $("editor").classList.toggle("bold", on);
+  $("btn-bold").classList.toggle("active", on);
+  localStorage.setItem(BOLD_KEY, on ? "1" : "0");
+}
+applyBold(localStorage.getItem(BOLD_KEY) === "1");
+$("btn-bold").addEventListener("click", () => applyBold(!$("editor").classList.contains("bold")));
+
+// Editor font size — persisted.
+const FONT_KEY = "audio_proofread.fontSize";
+const FONT_MIN = 10, FONT_MAX = 22;
+function applyFont(px) {
+  const clamped = Math.max(FONT_MIN, Math.min(FONT_MAX, Math.round(Number(px) || 14)));
+  document.documentElement.style.setProperty("--editor-font-size", `${clamped}px`);
+  $("font-readout").textContent = String(clamped);
+  localStorage.setItem(FONT_KEY, String(clamped));
+  $("font-smaller").disabled = clamped <= FONT_MIN;
+  $("font-larger").disabled = clamped >= FONT_MAX;
+}
+applyFont(Number(localStorage.getItem(FONT_KEY)) || 14);
+$("font-smaller").addEventListener("click", () => applyFont(parseInt($("font-readout").textContent, 10) - 1));
+$("font-larger").addEventListener("click", () => applyFont(parseInt($("font-readout").textContent, 10) + 1));
+
+// Splitter — drag the nav width.
+const NAV_KEY = "audio_proofread.navWidth";
+function applyNavWidth(px) {
+  const minW = 220;
+  const maxW = Math.max(minW, window.innerWidth - 360);
+  const clamped = Math.max(minW, Math.min(maxW, Math.round(px)));
+  document.documentElement.style.setProperty("--nav-width", `${clamped}px`);
+  localStorage.setItem(NAV_KEY, String(clamped));
+}
+applyNavWidth(Number(localStorage.getItem(NAV_KEY)) || 320);
+
+let dragging = false;
+$("splitter").addEventListener("mousedown", e => {
+  dragging = true;
+  document.body.classList.add("resizing");
+  e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  applyNavWidth(e.clientX);
+});
+window.addEventListener("mouseup", () => {
+  if (dragging) { dragging = false; document.body.classList.remove("resizing"); }
+});
+window.addEventListener("resize", () => applyNavWidth(Number(localStorage.getItem(NAV_KEY)) || 320));
+
+document.addEventListener("keydown", e => {
+  const isMod = e.ctrlKey || e.metaKey;
+  if (isMod && e.key === "s") {
+    e.preventDefault();
+    if (isDirty()) $("btn-commit").click();
+  } else if (isMod && e.shiftKey && e.key === "ArrowLeft") {
+    e.preventDefault();
+    if (!isDirty()) selectBlockByIdx(currentIdx - 1);
+    else alert("Commit or discard first.");
+  } else if (isMod && e.shiftKey && e.key === "ArrowRight") {
+    e.preventDefault();
+    if (!isDirty()) selectBlockByIdx(currentIdx + 1);
+    else alert("Commit or discard first.");
+  } else if (isMod && e.shiftKey && (e.key === "M" || e.key === "m")) {
+    e.preventDefault();
+    const btn = $("btn-mark-proofread");
+    if (!btn.hidden && !btn.disabled) btn.click();
+  } else if (isMod && e.shiftKey && (e.key === "W" || e.key === "w")) {
+    e.preventDefault();
+    swapSpeakerAtCursor();
+  } else if (isMod && e.shiftKey && e.code === "Space") {
+    e.preventDefault();
+    if (!$("btn-play-from-start").disabled) playFromStart();
+  }
+});
+
+window.addEventListener("beforeunload", e => {
+  if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
+});
+
+init();
+})();
+</script>
+</body>
+</html>

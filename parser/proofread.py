@@ -296,6 +296,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(html_path.read_bytes(), "text/html; charset=utf-8")
             return
 
+        if path == "/proofread_shared.js":
+            js_path = HERE / "proofread_shared.js"
+            if not js_path.exists():
+                self._send(b"proofread_shared.js missing", "text/plain", 500)
+                return
+            self._send(js_path.read_bytes(), "application/javascript; charset=utf-8")
+            return
+
         if path == "/api/letters":
             self._send_json(STATE.summaries())
             return

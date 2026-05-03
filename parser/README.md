@@ -77,4 +77,17 @@ Three-pane UI: year/letter nav on the left, editable text in the middle, scanned
 
 `./run.sh` re-parses, re-maps pages, rebuilds the per-chapter letters and starts the server in one shot — use it after a session that changes letter structure.
 
+## Proof-listening the audio transcript
+
+A sibling tool serves an analogous editor for `sources/audio/transcript.txt` against the audio recordings:
+
+```sh
+.venv/bin/python proofread_audio.py
+# open http://localhost:8766
+```
+
+Two-pane UI: clip + timestamped-block nav on the left, audio player + editable text on the right. The block granularity matches Whisper's timestamp granularity — selecting a block seeks the audio to that timestamp. Same `>>>>>` proofread-marker convention and same keybindings as the letters tool, plus Ctrl+Shift+Space to play from the block start and Ctrl+Shift+W to swap the speaker tag (`[Wilhelm]` ↔ `[Tilman]`) on the cursor's line.
+
+Both tools share `proofread_shared.js` for diff rendering.
+
 See `schema.md` for the full output schema.
