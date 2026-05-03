@@ -28,7 +28,7 @@ Eingeschobene Passagen in Klammern sind spätere Anmerkungen Wilhelms (1989), di
 **Familie und nähere Verwandte**
 - **Arthur Klingberg** – Mariannes Vater, stirbt nach längerer Krankheit am 31.12.1942 an Herzschlag.
 - **Heinz Klingberg** – Mariannes Bruder, Panzersoldat (1. Panzerarmee, später bei Guderian). Seine Einsätze in Polen, Frankreich, Russland und Ostpreußen bilden in den Briefen den parallelen roten Faden zu Wilhelms Schicksal – Marianne bangt um beide Männer zugleich; erhält im Februar 1944 das EK.
-- **Wolfgang** – Schwager in der Wehrmacht, mit seiner Einheit von Witebsk bis Norditalien im Einsatz, mehrfach im Lazarett (u. a. Padua).
+- **Wolfgang Kellermann** – Wilhelms Bruder in der Wehrmacht, mit seiner Einheit von Witebsk bis Norditalien im Einsatz, mehrfach im Lazarett (u. a. Padua).
 
 **Engste Kameraden der 2./AR 844**
 - **Heinz Auer** (Textilvertreter aus Glauchau) – Wilhelms wichtigster Vertrauter über alle Jahre hinweg; teilt in fast jeder Garnison das Quartier.
