@@ -116,3 +116,19 @@ Nach dem britischen Rheinübergang bei Wesel wird die V‑2‑Division in der Na
 Am 1. Mai erfährt die Truppe, dass Hitler tot ist; Wilhelm wird zum Unteroffizier befördert und schlägt sich zum amerikanischen Brückenkopf bei Dömitz durch. Als klar wird, dass der Brückenkopf abends an die Russen übergeben wird, schwimmt er mit Hilfe von Autoschläuchen durch die kalte Elbe. Nach drei Tagen und Nächten ohne Dach und Essen auf einem Sportplatz bei Herford und einer geglückten Flucht aus einem Güterzug bei Krefeld wandert er drei Wochen zu Fuß – über Sauerland, Westerwald, Vogelsberg, Rhön und Thüringer Raum, mit einem kleinen KdF‑Atlas und einem noch kleineren Kompass – quer durch das zerfallene Deutschland.
 
 Am 29. Mai 1945, gegen 20 Uhr, steht er mit verdreckten Füßen wieder vor der Wohnungstür in der Stiftstraße 39 in Chemnitz.
+
+## Von Wilhelm selbst gefahrenes/bedientes Gerät
+
+Wilhelm war über die ganzen sechs Jahre hinweg in erster Linie Kraftfahrer; nur in der Grundausbildung und in der letzten Phase 1945 stand er auch direkt am Geschütz. Diese Liste fasst zusammen, welches Material er selbst bedient hat.
+
+**Geschütze**
+
+- **15‑cm‑schwere Feldhaubitze 18 (sFH 18)** – das Hauptgeschütz seiner Batterie 1939–1943. Wilhelm war an der Bedienung ausgebildet (Memoiren, „Ausbildung […] am Geschütz und dann vor allem als Kraftfahrer auf der Zugmaschine"); er fuhr eine sFH 18 als Geschützführer-Zugmaschine durch Polen, den Westfeldzug und Russland.
+- **10,5‑cm‑Haubitze** – im April 1945 in Lenzen, als die V‑2‑Truppe behelfsmäßig zur Artilleriebatterie umgegliedert wird, erhält die Einheit „10,5 cm Haubitzen" und wird bei Fehrbellin gegen die Rote Armee eingesetzt (Erzähltext 1945 / Memoiren-Zusammenfassung „Artillerie 10 cm").
+
+**Zugmaschinen und Lkw**
+
+- **8‑Tonnen‑Halbketten‑Zugmaschine** mit angehängter sFH 18 – Wilhelms erste „Maschine", ab 4. September 1939 von der Yorkstr.‑Kaserne in Chemnitz; hinter ihm acht Kanoniere und der Geschützführer (Memoiren, S. 46 / KTB 1939). Diese Zugmaschine bleibt bis weit in den Russlandfeldzug hinein sein Stammfahrzeug („luftige Zugmaschine", KTB Oktober 1942), bis sie im Oktober 1942 im Waldkaukasus durch Pleuelriss ausfällt und in die Heereswerkstatt Rostow geschleppt wird.
+- **Munitions‑Lkw der 2. Batterie** – ab Sommer 1940 zeitweise als „Munifahrer bei Findewirth" eingesetzt (KTB 16. 7. 1940), später regelmäßig im Russlandfeldzug; auf diesem Lkw übersteht er den russischen Raketenangriff im Oktober 1941 (Lenkrad halb herausgerissen, Rahmen voller Splitter) und verliert er im September 1942 vor Noworossijsk seinen Beifahrer Max Meinel bei einem Bombenangriff.
+- **Mercedes 170 V** – im Juni 1941 zum Beginn des Russlandfeldzuges fährt er kurzzeitig den Pkw des Verpflegungs-Uffz. Faulwasser („Ich habe wieder umgesattelt und fahre einen Mercedes 170 V. Vornehm was?", KTB 22. 6. 1941). Denselben Wagentyp bringt er Mitte 1942 während des Heimaturlaubs illegal seinen schwiegervaterlichen Mercedes 170 V nach Bad Nauheim – kein militärisches Gerät, aber dasselbe Modell.
+- **30‑Tonnen‑Zug (V‑2‑Transportgespann)** – ab Oktober 1943 bei der V‑2‑Truppe Hauptaufgabe als Zugmaschinenfahrer: nächtliche Fahrten von Peenemünde nach Daber/Hinterpommern mit Versuchsraketen („Versuchsrakete von Peenemünde nach Daber gefahren. 30 to ‑ Zug", Memoiren S. 47; KTB 13. 1. 1944 „Rakete in Peenemünde mit Zgkw. abholen"; 4. 2. 1944 „Fahrt mit der Zgkw, ca. 500 km").
