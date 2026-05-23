@@ -23,9 +23,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 AUDIO_ROOT = ROOT / "sources" / "audio"
+MAPS_ROOT = ROOT / "sources" / "maps"
 TRANSCRIPT = AUDIO_ROOT / "transcript.txt"
 HERE = Path(__file__).resolve().parent
 PORT = 8766
+MAP_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 PROOFREAD_MARKER = ">>>>>"
 ANNOTATION_MARKER = "#####"
 
@@ -265,6 +267,34 @@ def safe_audio_path(rel: str) -> Path | None:
     return candidate
 
 
+def safe_map_path(rel: str) -> Path | None:
+    """Resolve `rel` against MAPS_ROOT, refusing path traversal."""
+    try:
+        candidate = (MAPS_ROOT / rel).resolve()
+        candidate.relative_to(MAPS_ROOT.resolve())
+    except (ValueError, OSError):
+        return None
+    if not candidate.exists() or not candidate.is_file():
+        return None
+    if candidate.suffix.lower() not in MAP_EXTS:
+        return None
+    return candidate
+
+
+def _natural_key(s: str) -> list:
+    """Sort key that orders embedded numbers numerically (so -2 precedes -10)."""
+    return [int(t) if t.isdigit() else t.lower()
+            for t in re.split(r"(\d+)", s)]
+
+
+def list_maps() -> list[str]:
+    if not MAPS_ROOT.exists():
+        return []
+    names = [p.name for p in MAPS_ROOT.iterdir()
+             if p.is_file() and p.suffix.lower() in MAP_EXTS]
+    return sorted(names, key=_natural_key)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):
         pass
@@ -413,6 +443,27 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(b"not found", "text/plain", 404)
                 return
             self._send_audio(p)
+            return
+
+        if path == "/api/maps":
+            self._send_json(list_maps())
+            return
+
+        if path.startswith("/maps/"):
+            rel = urllib.parse.unquote(path[len("/maps/"):])
+            p = safe_map_path(rel)
+            if not p:
+                self._send(b"not found", "text/plain", 404)
+                return
+            ctype = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+            }.get(p.suffix.lower(), "application/octet-stream")
+            self._send(p.read_bytes(), ctype,
+                       extra={"Cache-Control": "private, max-age=3600"})
             return
 
         self._send(b"not found", "text/plain", 404)
