@@ -6,7 +6,7 @@ transcript text can be edited while playing back the corresponding audio
 from its starting timestamp. Committing writes back to
 sources/audio/transcript.txt atomically.
 
-Mirrors the conventions of proofread.py for the kriegstagebuch letters:
+Mirrors the conventions of proofread_letters.py for the kriegstagebuch letters:
 the >>>>> marker occupies the blank-separator slot between two consecutive
 blocks, and "Mark as proofread" advances it past the current block.
 """
@@ -403,7 +403,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(summaries)
             return
 
-        if path == "/api/search-index":
+        if path == "/api/audio/search-index":
             with STATE_LOCK:
                 idx = [{"id": b["id"],
                         "text": STATE.raw_text(b["line_start"], b["line_end"])}

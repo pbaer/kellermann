@@ -593,7 +593,7 @@ function updateDirty() {
 
 async function init() {
   blocks = await api("/api/blocks");
-  searchIndex = await api("/api/search-index");
+  searchIndex = await api("/api/audio/search-index");
   search = createSearch({
     navRoot: $("nav-list"),
     getIndex: () => searchIndex,
@@ -630,7 +630,7 @@ async function init() {
 }
 
 async function refreshSearchIndex() {
-  searchIndex = await api("/api/search-index");
+  searchIndex = await api("/api/audio/search-index");
   if (search) search.refresh();
 }
 
