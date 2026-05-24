@@ -19,5 +19,9 @@ echo "▶ build_chapter_letters.py"
 "$PY" build_chapter_letters.py
 
 echo
+echo "▶ precompute_waveforms.py"
+"$PY" precompute_waveforms.py
+
+echo
 echo "▶ proofread.py"
 exec "$PY" proofread.py

@@ -15,9 +15,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import struct
+import subprocess
 import sys
 import threading
 import urllib.parse
+from array import array
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -295,6 +298,203 @@ def list_maps() -> list[str]:
     return sorted(names, key=_natural_key)
 
 
+# Waveform peak extraction. The display only needs a coarse amplitude envelope,
+# so audio is decoded to 8 kHz mono and reduced to per-bucket (min, max) pairs.
+#
+# Decoding per block with ffmpeg is too slow to feel instant, so peaks for the
+# whole clip are precomputed once into a sidecar file ("<clip>.mp3.peaks") and
+# the server just slices the requested window out of that (sub-millisecond).
+# precompute_waveforms.py (and run.sh) build the sidecars up front; if one is
+# missing the server still answers from a fast windowed ffmpeg decode and kicks
+# off the sidecar build in the background so the next request is instant.
+WAVEFORM_SR = 8000
+PEAKS_PER_SEC = 200                  # sidecar resolution — one (min,max) per 5 ms
+PEAKS_MAGIC = b"WKP1"
+PEAKS_SUFFIX = ".peaks"
+
+_peaks_mem: dict = {}                # clip path str -> (mtime, pps, mins, maxs)
+_peaks_lock = threading.Lock()
+_peaks_building: set = set()         # clips with an in-flight background build
+
+
+def compute_waveform(path: Path, start: float, dur: float, buckets: int):
+    """Windowed ffmpeg fallback: decode just [start, start+dur] to mono PCM and
+    reduce to per-bucket (min, max) floats in [-1, 1]. Returns (mins, maxs) or
+    None on failure. -ss before -i fast-seeks then decodes precisely, so the
+    window aligns without decoding the whole file."""
+    cmd = ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}", "-i", str(path),
+           "-t", f"{dur:.3f}", "-ac", "1", "-ar", str(WAVEFORM_SR),
+           "-f", "s16le", "-"]
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    raw = proc.stdout
+    n = len(raw) // 2
+    mins = [0.0] * buckets
+    maxs = [0.0] * buckets
+    if n == 0:
+        return mins, maxs
+    samples = array("h")          # signed 16-bit, native (little-endian) order
+    samples.frombytes(raw[:n * 2])
+    inv = 1.0 / 32768.0
+    step = n / buckets
+    for b in range(buckets):
+        lo = int(b * step)
+        hi = int((b + 1) * step)
+        if hi <= lo:
+            hi = lo + 1
+        if hi > n:
+            hi = n
+        if lo >= n:
+            lo = n - 1
+        seg = samples[lo:hi]
+        if not seg:
+            continue
+        mins[b] = round(min(seg) * inv, 4)
+        maxs[b] = round(max(seg) * inv, 4)
+    return mins, maxs
+
+
+def peaks_sidecar_path(path: Path) -> Path:
+    """Sidecar peaks file for a clip, e.g. '01 Foo.mp3' -> '01 Foo.mp3.peaks'."""
+    return path.with_name(path.name + PEAKS_SUFFIX)
+
+
+def generate_peaks_file(path: Path) -> bool:
+    """Decode the whole clip once and write a sidecar of int16 (min, max) peaks
+    at PEAKS_PER_SEC. Returns True on success. Writes atomically via a temp file.
+    """
+    cmd = ["ffmpeg", "-v", "error", "-i", str(path),
+           "-ac", "1", "-ar", str(WAVEFORM_SR), "-f", "s16le", "-"]
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL, timeout=600)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if proc.returncode != 0:
+        return False
+    raw = proc.stdout
+    n = len(raw) // 2
+    samples = array("h")
+    samples.frombytes(raw[:n * 2])
+    bucket = max(1, WAVEFORM_SR // PEAKS_PER_SEC)     # samples per bucket (= 40)
+    num = (n + bucket - 1) // bucket
+    mins = array("h", bytes(2 * num))
+    maxs = array("h", bytes(2 * num))
+    for b in range(num):
+        lo = b * bucket
+        hi = min(n, lo + bucket)
+        seg = samples[lo:hi]
+        if seg:
+            mins[b] = min(seg)
+            maxs[b] = max(seg)
+    header = PEAKS_MAGIC + struct.pack("<II", PEAKS_PER_SEC, num)
+    sc = peaks_sidecar_path(path)
+    tmp = sc.with_name(sc.name + ".tmp")
+    try:
+        with tmp.open("wb") as f:
+            f.write(header)
+            f.write(mins.tobytes())
+            f.write(maxs.tobytes())
+        os.replace(tmp, sc)
+    except OSError:
+        return False
+    return True
+
+
+def load_peaks(path: Path):
+    """Return (pps, mins, maxs) from the sidecar via an mtime-keyed in-memory
+    cache, or None if there's no readable sidecar."""
+    sc = peaks_sidecar_path(path)
+    try:
+        mtime = sc.stat().st_mtime
+    except OSError:
+        return None
+    key = str(path)
+    with _peaks_lock:
+        cached = _peaks_mem.get(key)
+        if cached and cached[0] == mtime:
+            return cached[1], cached[2], cached[3]
+    try:
+        data = sc.read_bytes()
+    except OSError:
+        return None
+    if len(data) < 12 or data[:4] != PEAKS_MAGIC:
+        return None
+    pps, num = struct.unpack("<II", data[4:12])
+    body = data[12:]
+    if len(body) < 4 * num:
+        return None
+    mins = array("h"); mins.frombytes(body[:2 * num])
+    maxs = array("h"); maxs.frombytes(body[2 * num:4 * num])
+    with _peaks_lock:
+        _peaks_mem[key] = (mtime, pps, mins, maxs)
+    return pps, mins, maxs
+
+
+def _build_peaks_async(path: Path) -> None:
+    """Build a missing sidecar in a background thread (deduped per clip)."""
+    key = str(path)
+    with _peaks_lock:
+        if key in _peaks_building:
+            return
+        _peaks_building.add(key)
+
+    def worker():
+        try:
+            generate_peaks_file(path)
+        finally:
+            with _peaks_lock:
+                _peaks_building.discard(key)
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
+def waveform_window(path: Path, start: float, dur: float, buckets: int):
+    """Per-bucket (min, max) floats in [-1, 1] for [start, start+dur]. Slices
+    the precomputed sidecar when present; otherwise decodes just the window with
+    ffmpeg and kicks off a background sidecar build for next time."""
+    peaks = load_peaks(path)
+    if peaks is None:
+        _build_peaks_async(path)
+        return compute_waveform(path, start, dur, buckets)
+    pps, mins, maxs = peaks
+    out_min = [0.0] * buckets
+    out_max = [0.0] * buckets
+    i0 = max(0, int(round(start * pps)))
+    i1 = min(len(mins), int(round((start + dur) * pps)))
+    span = i1 - i0
+    if span <= 0:
+        return out_min, out_max
+    inv = 1.0 / 32768.0
+    step = span / buckets
+    for b in range(buckets):
+        lo = i0 + int(b * step)
+        hi = i0 + int((b + 1) * step)
+        if hi <= lo:
+            hi = lo + 1
+        if hi > i1:
+            hi = i1
+        mn = 32767
+        mx = -32768
+        for i in range(lo, hi):
+            v = mins[i]
+            if v < mn:
+                mn = v
+            v = maxs[i]
+            if v > mx:
+                mx = v
+        if mn > mx:
+            mn = mx = 0
+        out_min[b] = round(mn * inv, 4)
+        out_max[b] = round(mx * inv, 4)
+    return out_min, out_max
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):
         pass
@@ -443,6 +643,30 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(b"not found", "text/plain", 404)
                 return
             self._send_audio(p)
+            return
+
+        if path == "/api/audio/waveform":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            rel = urllib.parse.unquote(qs.get("clip", [""])[0])
+            try:
+                start = max(0.0, float(qs.get("start", ["0"])[0]))
+                dur = float(qs.get("dur", ["0"])[0])
+                buckets = int(qs.get("buckets", ["1000"])[0])
+            except ValueError:
+                self._send_json({"error": "bad params"}, 400)
+                return
+            p = safe_audio_path(rel)
+            if not p or dur <= 0:
+                self._send_json({"error": "not found"}, 404)
+                return
+            buckets = max(1, min(4000, buckets))
+            result = waveform_window(p, start, dur, buckets)
+            if result is None:
+                self._send_json({"error": "decode failed"}, 500)
+                return
+            mins, maxs = result
+            self._send_json({"start": start, "dur": dur, "buckets": buckets,
+                             "sample_rate": WAVEFORM_SR, "min": mins, "max": maxs})
             return
 
         if path == "/api/maps":

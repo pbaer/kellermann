@@ -152,48 +152,23 @@
   #header .controls button:disabled { opacity: 0.35; cursor: not-allowed; border-color: #c9bfa3; }
   #position { font-size: 0.72rem; letter-spacing: 0.06em; color: #6a5a3a; font-variant-numeric: tabular-nums; min-width: 56px; text-align: center; }
 
-  /* Audio bar */
+  /* Audio bar — a transport-controls row on top, full-width waveform below. */
   #audio-bar {
     padding: 10px 14px;
     background: #2a2520;
     color: #c9a86a;
     border-bottom: 1px solid #4a3f32;
     display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #audio-bar .transport-row {
+    display: flex;
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
   }
   #audio-bar #btn-play-pause { width: 38px; padding: 4px 0; font-size: 0.95rem; line-height: 1; }
-  #audio-bar .scrubber {
-    flex: 1;
-    min-width: 200px;
-    height: 10px;
-    background: #1a1510;
-    border: 1px solid #4a3f32;
-    border-radius: 5px;
-    position: relative;
-    cursor: pointer;
-  }
-  #audio-bar .scrubber-fill {
-    height: 100%;
-    background: #c9a86a;
-    border-radius: 4px;
-    width: 0;
-    pointer-events: none;
-  }
-  #audio-bar .scrubber-thumb {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    transform: translate(-50%, -50%);
-    width: 14px;
-    height: 14px;
-    background: #c9a86a;
-    border: 2px solid #2a2520;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  #audio-bar.no-audio .scrubber { opacity: 0.35; cursor: not-allowed; }
   #audio-bar .scrubber-time {
     font-family: "Courier New", Courier, monospace;
     font-size: 0.78rem;
@@ -226,7 +201,54 @@
   #audio-bar .speed-group button.active { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
   #audio-bar .label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8a7a5a; }
   #audio-bar.no-audio { background: #4a3f32; color: #8a7a5a; }
-  #audio-bar.no-audio .placeholder { font-style: italic; font-size: 0.82rem; padding: 6px 0; }
+
+  /* Waveform scrubber — a canvas amplitude envelope spanning the full width,
+     with the lead-in/lead-out spans dimmed and the block's logical start/end
+     marked, so it's clear which audio belongs to the current transcript block. */
+  #waveform-wrap {
+    position: relative;
+    width: 100%;
+    height: 68px;
+    background: #1a1510;
+    border: 1px solid #4a3f32;
+    border-radius: 3px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  #waveform-wrap.no-audio { cursor: not-allowed; }
+  #waveform { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  /* Dim the audio outside the block's logical [start, end] (the lead-in and
+     lead-out); the clear middle band is the audio tied to this block. */
+  .wf-region {
+    position: absolute; top: 0; bottom: 0;
+    background: rgba(8, 6, 4, 0.62);
+    pointer-events: none;
+  }
+  /* Dashed markers at the lead-in / lead-out boundaries. */
+  .wf-boundary {
+    position: absolute; top: 0; bottom: 0;
+    width: 0;
+    border-left: 1px dashed #c9a86a;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+  .wf-boundary[hidden] { display: none; }
+  #wf-playhead {
+    position: absolute; top: 0; bottom: 0; left: 0;
+    width: 2px;
+    background: #f4f1ea;
+    box-shadow: 0 0 4px rgba(244, 241, 234, 0.75);
+    pointer-events: none;
+  }
+  .wf-placeholder {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    color: #8a7a5a;
+    font-style: italic;
+    font-size: 0.82rem;
+    pointer-events: none;
+  }
+  .wf-placeholder[hidden] { display: none; }
 
   /* Editor */
   #editor-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -460,24 +482,31 @@
     </header>
 
     <div id="audio-bar">
-      <button id="btn-play-from-start" class="primary" title="Play from block start (Ctrl+Shift+Space)">▶ Play from start</button>
-      <div class="seek-controls">
-        <button id="btn-back-3" title="Skip back 3s">−3s</button>
-        <button id="btn-fwd-3" title="Skip forward 3s">+3s</button>
+      <div class="transport-row">
+        <button id="btn-play-from-start" class="primary" title="Play from block start (Ctrl+Shift+Space)">▶ Play from start</button>
+        <div class="seek-controls">
+          <button id="btn-back-3" title="Skip back 3s">−3s</button>
+          <button id="btn-fwd-3" title="Skip forward 3s">+3s</button>
+        </div>
+        <button id="btn-play-pause" title="Play/pause">▶</button>
+        <span class="scrubber-time" id="scrubber-time">0:00 / 0:00</span>
+        <audio id="audio" preload="metadata" hidden></audio>
+        <span class="label">Speed</span>
+        <div class="speed-group" id="speed-group">
+          <button data-speed="0.75">0.75×</button>
+          <button data-speed="1" class="active">1×</button>
+          <button data-speed="1.25">1.25×</button>
+          <button data-speed="1.5">1.5×</button>
+        </div>
       </div>
-      <button id="btn-play-pause" title="Play/pause">▶</button>
-      <div class="scrubber" id="scrubber">
-        <div class="scrubber-fill" id="scrubber-fill"></div>
-        <div class="scrubber-thumb" id="scrubber-thumb"></div>
-      </div>
-      <span class="scrubber-time" id="scrubber-time">0:00 / 0:00</span>
-      <audio id="audio" preload="metadata" hidden></audio>
-      <span class="label">Speed</span>
-      <div class="speed-group" id="speed-group">
-        <button data-speed="0.75">0.75×</button>
-        <button data-speed="1" class="active">1×</button>
-        <button data-speed="1.25">1.25×</button>
-        <button data-speed="1.5">1.5×</button>
+      <div id="waveform-wrap" title="Click or drag to scrub">
+        <canvas id="waveform"></canvas>
+        <div class="wf-region" id="wf-leadin"></div>
+        <div class="wf-region" id="wf-leadout"></div>
+        <div class="wf-boundary" id="wf-bound-start" hidden></div>
+        <div class="wf-boundary" id="wf-bound-end" hidden></div>
+        <div id="wf-playhead"></div>
+        <div class="wf-placeholder" id="wf-placeholder" hidden>(no audio for this block)</div>
       </div>
     </div>
 
@@ -749,19 +778,149 @@ function computeBlockEnd(idx) {
   return null; // last block in clip — fall back to audio.duration when known
 }
 
-// Start playback 1 second before the block's logical start so the spoken
-// content doesn't begin abruptly. Clamped to 0 so blocks that begin at the
-// very top of an mp3 file aren't shifted into negative time. The displayed
-// playback range is [leadInStart, blockEnd], so the lead-in counts toward
+// Start playback 2 seconds before the block's logical start so the spoken
+// content doesn't begin abruptly and a little of the previous segment is
+// audible for context. Clamped to 0 so blocks that begin at the very top of an
+// mp3 file aren't shifted into negative time. The displayed playback range is
+// [leadInStart, leadOutEnd], so both the lead-in and the lead-out count toward
 // the clip length shown in the scrubber/time-readout.
 function leadInStart() {
-  return Math.max(0, blockStart - 1);
+  return Math.max(0, blockStart - 2);
+}
+
+// Mirror of leadInStart() at the tail end: play ~2 seconds past the block's
+// logical end so a little of the next segment is audible for context. Clamped
+// to the clip duration when known, so we never run past the end of the file —
+// the last block in a clip just plays to its end. Returns null only when no end
+// is known yet (no next block and duration not loaded).
+function leadOutEnd() {
+  const audio = $("audio");
+  const base = blockEnd != null
+    ? blockEnd
+    : (Number.isFinite(audio.duration) ? audio.duration : null);
+  if (base == null) return null;
+  const extended = base + 2;
+  return Number.isFinite(audio.duration) ? Math.min(extended, audio.duration) : extended;
 }
 
 function blockDuration() {
   const audio = $("audio");
-  const end = blockEnd != null ? blockEnd : (audio.duration || 0);
-  return Math.max(0, end - leadInStart());
+  const end = leadOutEnd();
+  const e = end != null ? end : (audio.duration || 0);
+  return Math.max(0, e - leadInStart());
+}
+
+// ---- waveform scrubber ----
+// A canvas amplitude envelope of the current block's audio window
+// [leadInStart, leadOutEnd]. Peaks come from the server (ffmpeg) at a fixed
+// resolution and are cached per window; the canvas re-renders from the cached
+// peaks on resize without re-fetching. The lead-in/lead-out spans are dimmed
+// and the block's logical start/end are marked so it's clear which audio is
+// associated with the current transcript block.
+const WF_BUCKETS = 1200;
+const wfCache = new Map();   // window key -> {min:[], max:[]}
+let wfPeaks = null;          // peaks for the current window, or null
+let wfWinStart = 0, wfWinEnd = 0;
+let wfReqToken = 0;          // guards against out-of-order fetch responses
+
+function clearWaveform() {
+  const canvas = $("waveform");
+  canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function renderWaveform() {
+  const canvas = $("waveform");
+  const wrap = $("waveform-wrap");
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.max(1, Math.round(wrap.clientWidth));
+  const H = Math.max(1, Math.round(wrap.clientHeight));
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!wfPeaks) return;
+  const mins = wfPeaks.min, maxs = wfPeaks.max;
+  const n = Math.min(mins.length, maxs.length);
+  if (!n) return;
+  // Auto-gain so quiet speech is visible; clamp so near-silence isn't blown up.
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    const a = Math.max(Math.abs(mins[i]), Math.abs(maxs[i]));
+    if (a > peak) peak = a;
+  }
+  const gain = peak > 0.01 ? Math.min(0.95 / peak, 12) : 1;
+  const mid = H / 2;
+  ctx.fillStyle = "#c9a86a";
+  for (let x = 0; x < W; x++) {
+    const i0 = Math.floor(x / W * n);
+    const i1 = Math.max(i0 + 1, Math.floor((x + 1) / W * n));
+    let mn = 1, mx = -1;
+    for (let i = i0; i < i1 && i < n; i++) {
+      if (mins[i] < mn) mn = mins[i];
+      if (maxs[i] > mx) mx = maxs[i];
+    }
+    if (mn > mx) { mn = 0; mx = 0; }
+    let yTop = mid - mx * gain * mid;
+    let yBot = mid - mn * gain * mid;
+    if (yTop < 0) yTop = 0;
+    if (yBot > H) yBot = H;
+    ctx.fillRect(x, yTop, 1, Math.max(1, yBot - yTop));
+  }
+}
+
+// Place the dimming overlays and boundary markers from the current window
+// [wfWinStart, wfWinEnd] and the block's logical [blockStart, blockEnd].
+function positionWaveformOverlays() {
+  const total = Math.max(0.001, wfWinEnd - wfWinStart);
+  const clamp = v => Math.max(0, Math.min(100, v));
+  const startPct = ((blockStart - wfWinStart) / total) * 100;
+  const blockEndSec = blockEnd != null ? blockEnd : wfWinEnd;
+  const endPct = ((blockEndSec - wfWinStart) / total) * 100;
+  $("wf-leadin").style.left = "0%";
+  $("wf-leadin").style.width = clamp(startPct) + "%";
+  $("wf-leadout").style.left = clamp(endPct) + "%";
+  $("wf-leadout").style.width = clamp(100 - endPct) + "%";
+  $("wf-bound-start").style.left = clamp(startPct) + "%";
+  $("wf-bound-end").style.left = clamp(endPct) + "%";
+  $("wf-bound-start").hidden = startPct <= 0.2;   // block starts the clip — no lead-in
+  $("wf-bound-end").hidden = endPct >= 99.8;       // last block / file end — no lead-out
+}
+
+function loadWaveform() {
+  const hasAudio = !!(currentBlock && currentBlock.clip && currentBlock.start_seconds != null);
+  $("wf-placeholder").hidden = hasAudio;
+  if (!hasAudio) { wfPeaks = null; clearWaveform(); return; }
+  const winStart = leadInStart();
+  const winEnd = leadOutEnd();
+  if (winEnd == null) {            // duration not known yet (last block) — wait for metadata
+    wfPeaks = null; clearWaveform();
+    return;
+  }
+  wfWinStart = winStart;
+  wfWinEnd = winEnd;
+  positionWaveformOverlays();
+  const dur = Math.max(0.1, winEnd - winStart);
+  const clip = currentBlock.clip;
+  const key = `${clip}|${winStart.toFixed(2)}|${dur.toFixed(2)}`;
+  if (wfCache.has(key)) {
+    wfPeaks = wfCache.get(key);
+    renderWaveform();
+    return;
+  }
+  wfPeaks = null;
+  clearWaveform();
+  const token = ++wfReqToken;
+  const url = `/api/audio/waveform?clip=${encodeURIComponent(clip)}`
+    + `&start=${winStart.toFixed(3)}&dur=${dur.toFixed(3)}&buckets=${WF_BUCKETS}`;
+  fetch(url).then(r => r.ok ? r.json() : null).then(data => {
+    if (token !== wfReqToken) return;          // a newer block was selected meanwhile
+    if (!data || data.error) { wfPeaks = null; clearWaveform(); return; }
+    wfPeaks = { min: data.min, max: data.max };
+    wfCache.set(key, wfPeaks);
+    if (wfCache.size > 50) wfCache.delete(wfCache.keys().next().value);
+    renderWaveform();
+  }).catch(() => { if (token === wfReqToken) { wfPeaks = null; clearWaveform(); } });
 }
 
 function updateAudioForBlock() {
@@ -781,25 +940,19 @@ function updateAudioForBlock() {
     $("btn-play-pause"),
     ...document.querySelectorAll("#speed-group button"),
   ];
+  $("waveform-wrap").classList.toggle("no-audio", !audioUrl);
   if (!audioUrl) {
     bar.classList.add("no-audio");
     audio.removeAttribute("src");
     audio.load();
     playbackBtns.forEach(b => { b.disabled = true; });
-    if (!bar.querySelector(".placeholder")) {
-      const span = document.createElement("span");
-      span.className = "placeholder";
-      span.textContent = "(no audio for this block)";
-      bar.insertBefore(span, audio);
-    }
     pendingSeek = null;
     pendingPlay = false;
+    loadWaveform();
     updateAudioPosition();
     return;
   }
   bar.classList.remove("no-audio");
-  const placeholder = bar.querySelector(".placeholder");
-  if (placeholder) placeholder.remove();
   playbackBtns.forEach(b => { b.disabled = false; });
 
   const target = leadInStart();
@@ -814,22 +967,22 @@ function updateAudioForBlock() {
     try { audio.currentTime = target; } catch { pendingSeek = target; }
     if (shouldPlay) audio.play().catch(() => {});
   }
+  loadWaveform();
   updateAudioPosition();
 }
 
 function updateAudioPosition() {
   const audio = $("audio");
   const dur = blockDuration();
+  const ph = $("wf-playhead");
   if (dur <= 0 || !audio.src) {
-    $("scrubber-fill").style.width = "0%";
-    $("scrubber-thumb").style.left = "0%";
+    ph.style.left = "0%";
     $("scrubber-time").textContent = "0:00 / 0:00";
     return;
   }
   const rel = Math.max(0, Math.min(dur, (audio.currentTime || 0) - leadInStart()));
   const pct = (rel / dur) * 100;
-  $("scrubber-fill").style.width = `${pct}%`;
-  $("scrubber-thumb").style.left = `${pct}%`;
+  ph.style.left = `${pct}%`;
   $("scrubber-time").textContent = `${fmtTs(Math.floor(rel))} / ${fmtTs(Math.floor(dur))}`;
 }
 
@@ -854,23 +1007,40 @@ $("audio").addEventListener("loadedmetadata", () => {
     pendingPlay = false;
     $("audio").play().catch(() => {});
   }
+  loadWaveform();   // window end for the last block in a clip needs the duration
   updateAudioPosition();
 });
-$("audio").addEventListener("durationchange", updateAudioPosition);
+$("audio").addEventListener("durationchange", () => { loadWaveform(); updateAudioPosition(); });
 $("audio").addEventListener("timeupdate", () => {
   const audio = $("audio");
-  // Constrain playback to the current block. When the playhead crosses
-  // blockEnd (or audio.duration if blockEnd is unknown), pause and snap to
-  // the boundary so the seek bar UI stays inside [blockStart, blockEnd].
-  const limit = blockEnd != null ? blockEnd : (Number.isFinite(audio.duration) ? audio.duration : null);
+  // Constrain playback to the current block plus its lead-out. When the
+  // playhead crosses leadOutEnd (blockEnd + 2s, or audio.duration if there's no
+  // next block), pause and snap to the boundary so the seek bar UI stays inside
+  // [leadInStart, leadOutEnd].
+  const limit = leadOutEnd();
   if (limit != null && audio.currentTime >= limit && !audio.paused) {
     audio.pause();
     try { audio.currentTime = limit; } catch {}
   }
   if (!scrubbing) updateAudioPosition();
 });
-$("audio").addEventListener("play", () => { $("btn-play-pause").textContent = "⏸"; });
-$("audio").addEventListener("pause", () => { $("btn-play-pause").textContent = "▶"; });
+// The audio element's `timeupdate` only fires ~4x/sec, which makes the playhead
+// step jerkily. Drive it from requestAnimationFrame while playing instead, so it
+// sweeps at the display refresh rate (~60fps), reading currentTime each frame.
+let playheadRaf = null;
+function playheadLoop() {
+  updateAudioPosition();
+  playheadRaf = $("audio").paused ? null : requestAnimationFrame(playheadLoop);
+}
+$("audio").addEventListener("play", () => {
+  $("btn-play-pause").textContent = "⏸";
+  if (playheadRaf == null) playheadRaf = requestAnimationFrame(playheadLoop);
+});
+$("audio").addEventListener("pause", () => {
+  $("btn-play-pause").textContent = "▶";
+  if (playheadRaf != null) { cancelAnimationFrame(playheadRaf); playheadRaf = null; }
+  updateAudioPosition();
+});
 
 // ---- diff ----
 function updateDiff() {
@@ -997,15 +1167,16 @@ $("btn-back-3").addEventListener("click", () => {
 $("btn-fwd-3").addEventListener("click", () => {
   const a = $("audio");
   if (!a.src) return;
-  const limit = blockEnd != null ? blockEnd : (Number.isFinite(a.duration) ? a.duration : Infinity);
-  try { a.currentTime = Math.min(limit, a.currentTime + 3); } catch {}
+  const limit = leadOutEnd();
+  try { a.currentTime = Math.min(limit != null ? limit : Infinity, a.currentTime + 3); } catch {}
 });
 
 $("btn-play-pause").addEventListener("click", () => {
   const audio = $("audio");
   if (!audio.src) return;
   if (audio.paused) {
-    const limit = blockEnd != null ? blockEnd : (Number.isFinite(audio.duration) ? audio.duration : Infinity);
+    const lo = leadOutEnd();
+    const limit = lo != null ? lo : Infinity;
     const lead = leadInStart();
     if (audio.currentTime < lead || audio.currentTime >= limit) {
       try { audio.currentTime = lead; } catch {}
@@ -1019,15 +1190,14 @@ $("btn-play-pause").addEventListener("click", () => {
 function seekToScrubber(e) {
   const audio = $("audio");
   if (!audio.src) return;
-  const sc = $("scrubber");
-  const rect = sc.getBoundingClientRect();
+  const rect = $("waveform-wrap").getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
   const dur = blockDuration();
   if (dur <= 0) return;
   try { audio.currentTime = leadInStart() + ratio * dur; } catch {}
   updateAudioPosition();
 }
-$("scrubber").addEventListener("mousedown", e => {
+$("waveform-wrap").addEventListener("mousedown", e => {
   if (!$("audio").src) return;
   scrubbing = true;
   document.body.classList.add("scrubbing");
@@ -1145,6 +1315,24 @@ document.addEventListener("keydown", e => {
 window.addEventListener("beforeunload", e => {
   if (isDirty()) { e.preventDefault(); e.returnValue = ""; }
 });
+
+// Re-render the waveform (from cached peaks — no re-fetch) and reposition the
+// overlays whenever the pane width changes: nav/map splitter drags, window
+// resize, or the tab becoming visible.
+if (window.ResizeObserver) {
+  let rafPending = false;
+  const ro = new ResizeObserver(() => {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      renderWaveform();
+      positionWaveformOverlays();
+      updateAudioPosition();
+    });
+  });
+  ro.observe($("waveform-wrap"));
+}
 
 init();
 })();

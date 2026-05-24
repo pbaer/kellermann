@@ -5,3 +5,5 @@
 **/.env
 **/.playwright-mcp/
 **/.claude/
+# Precomputed audio waveform peak caches (derived from the source mp3s).
+**/*.peaks

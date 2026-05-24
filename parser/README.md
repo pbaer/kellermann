@@ -76,7 +76,7 @@ For an interactive tool, run the local proofreading app:
 This serves **one page with two modes** — toggle between them with the tabs at the top, or `Alt+1` (Letters) / `Alt+2` (Audio):
 
 - **Letters** — three-pane UI: year/letter nav on the left, editable text in the middle, scanned page on the right. Ctrl+S commits to the source `.txt`.
-- **Audio** — clip + timestamped-block nav on the left, audio player + editable text on the right, scrollable map pane below. The block granularity matches Whisper's timestamp granularity — selecting a block seeks the audio to that timestamp. Plus Ctrl+Shift+Space to play from the block start and Ctrl+Shift+W to swap the speaker tag (`[Wilhelm]` ↔ `[Tilman]`) on the cursor's line.
+- **Audio** — clip + timestamped-block nav on the left, audio player + editable text on the right, scrollable map pane below. A full-width **waveform scrubber** under the transport controls shows the amplitude envelope of the current block's audio window; the lead-in/lead-out spans are dimmed and the block's logical start/end are marked, so it's clear which audio belongs to the block. Playback runs from 2s before the block start to 2s after its end. The block granularity matches Whisper's timestamp granularity — selecting a block seeks the audio to that timestamp. Plus Ctrl+Shift+Space to play from the block start and Ctrl+Shift+W to swap the speaker tag (`[Wilhelm]` ↔ `[Tilman]`) on the cursor's line.
 
 Both modes share the `>>>>>` proofread-marker convention and the same core keybindings (Ctrl+S commit, Ctrl+Shift+M mark-as-proofread). Each mode keeps its full state — including **uncommitted edits** — while you switch to the other, so you can flip over to check something and flip back untouched; a dot on the tab flags a mode with pending changes.
 
@@ -85,5 +85,7 @@ Both modes share the `>>>>>` proofread-marker convention and the same core keybi
 ### How it's wired
 
 `proofread.py` is a thin shell (page: `proofread.html`): it imports `proofread_letters.py` (letters) and `proofread_audio.py` (audio) and reuses their `State` + request handlers unchanged, mounting each tool's page in its own `<iframe>` (`/tool/letters` → `proofread_letters.html`, `/tool/audio` → `proofread_audio.html`) so all in-page state survives a mode switch. Those two modules are implementation details of the combined tool; each can still be run on its own (`proofread_letters.py` → 8765, `proofread_audio.py` → 8766) but the combined `proofread.py` is the one to use. All of them share `proofread_shared.js` for diff/search rendering.
+
+The audio waveform is served by `/api/audio/waveform`, which slices a precomputed peak file. `precompute_waveforms.py` decodes each clip once (via **`ffmpeg`**) into a sidecar `"<clip>.mp3.peaks"` next to the mp3 — int16 (min,max) peaks at 200/sec — so the endpoint just slices the requested window out of it (sub-millisecond) instead of decoding on every block. `run.sh` runs it before launching the server (idempotent — skips clips whose sidecar is current), and the server also builds any missing sidecar lazily in the background, falling back to a windowed `ffmpeg` decode until it's ready. `ffmpeg` must be on `PATH`; the `.peaks` sidecars are derived caches and are git-ignored.
 
 See `schema.md` for the full output schema.
