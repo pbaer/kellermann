@@ -12,6 +12,7 @@ blocks, and "Mark as proofread" advances it past the current block.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -495,6 +496,164 @@ def waveform_window(path: Path, start: float, dur: float, buckets: int):
     return out_min, out_max
 
 
+# --- optional noise reduction -------------------------------------------------
+# Opt-in denoising for hiss/static-heavy clips, in increasing strength:
+#   low    — gentle afftdn (FFT spectral denoise), full band
+#   medium — stronger afftdn + band-limit
+#   high   — arnndn (RNNoise: a recurrent net trained to isolate *speech* from
+#            noise) when models/rnnoise.rnnn is installed, with a light afftdn
+#            pass and band-limiting to mop up residual hiss; falls back to an
+#            aggressive afftdn chain if the model is missing.
+# The whole clip is rendered once and cached in .proc-cache/, keyed by clip +
+# the exact filter chain + source mtime, so any change (chain edit, installing
+# the RNNoise model, a new source file) invalidates stale caches automatically.
+PROC_CACHE = AUDIO_ROOT / ".proc-cache"
+RNNOISE_MODEL = HERE / "models" / "rnnoise.rnnn"
+PROC_LEVELS = ("low", "medium", "high")
+# Render to FLAC, not MP3: MP3 has no sample-accurate timestamps, so the browser
+# *estimates* the playback timeline and currentTime drifts during long playback
+# (the playhead creeps ahead of the audio). FLAC is lossless with exact sample
+# counts and no encoder delay, so currentTime stays sample-accurate.
+PROC_FORMAT = "flac"
+
+
+def proc_chain(level: str):
+    """Return the ffmpeg -af filter chain for a denoise strength, or None."""
+    if level == "low":
+        return "highpass=f=70,afftdn=nr=12:nf=-40:tn=1"
+    if level == "medium":
+        return "highpass=f=90,afftdn=nr=24:nf=-32:tn=1,lowpass=f=7500"
+    if level == "high":
+        if RNNOISE_MODEL.is_file():
+            # RNNoise alone, full-band: strong speech-preserving denoise. We
+            # deliberately don't stack afftdn or a low-pass on top — that
+            # over-processed and muffled the voice ("filtered out almost
+            # everything"); RNNoise already removes the broadband hiss.
+            return f"highpass=f=80,arnndn=m={RNNOISE_MODEL}"
+        return "highpass=f=90,afftdn=nr=33:nf=-28:tn=1"
+    return None
+
+
+# Background render jobs, so the client can show real progress. token -> dict.
+_proc_jobs: dict = {}
+_proc_jobs_lock = threading.Lock()
+
+
+def _proc_token(rel: str, chain: str, mtime: float) -> str:
+    # PROC_FORMAT is part of the key so switching formats invalidates old renders.
+    h = hashlib.sha1(f"{rel}|{chain}|{PROC_FORMAT}|{mtime}".encode("utf-8"))
+    return h.hexdigest()[:16] + "." + PROC_FORMAT
+
+
+def safe_proc_path(token: str):
+    """Resolve a /audio-proc/<token> request to a cache file, refusing anything
+    that isn't a bare cache filename (no path traversal)."""
+    if not re.fullmatch(r"[0-9a-f]{16}\.(flac|mp3|wav)", token):
+        return None
+    p = PROC_CACHE / token
+    return p if p.is_file() else None
+
+
+def _probe_duration(path: Path):
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "csv=p=0", str(path)],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=30)
+        return float(out.stdout.strip())
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def _set_job(token: str, **kw) -> None:
+    with _proc_jobs_lock:
+        job = _proc_jobs.setdefault(
+            token, {"progress": 0.0, "status": "running", "url": None})
+        job.update(kw)
+
+
+def _proc_worker(token: str, src: Path, chain: str, out: Path) -> None:
+    """Render the clip with ffmpeg, parsing -progress to report fraction done."""
+    duration = _probe_duration(src) or 0.0
+    try:
+        PROC_CACHE.mkdir(exist_ok=True)
+        tmp = out.with_name(out.name + ".tmp")
+        cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-af", chain,
+               "-c:a", "flac", "-f", "flac",
+               "-progress", "pipe:1", "-nostats", str(tmp)]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, text=True)
+        for line in proc.stdout:
+            line = line.strip()
+            if duration > 0 and (line.startswith("out_time_us=")
+                                 or line.startswith("out_time_ms=")):
+                val = line.split("=", 1)[1]
+                if val and val != "N/A":
+                    try:                       # both fields are microseconds
+                        secs = int(val) / 1_000_000.0
+                        _set_job(token, progress=max(0.0, min(0.99, secs / duration)))
+                    except ValueError:
+                        pass
+        proc.wait()
+        if proc.returncode == 0 and tmp.exists():
+            os.replace(tmp, out)
+            # Build the waveform sidecar for the processed file too, so the
+            # waveform can be drawn from the *same* file that's played (the
+            # filters + re-encode shift the timeline ~10-25ms vs the original,
+            # which otherwise makes the playhead look off when denoise is on).
+            generate_peaks_file(out)
+            _set_job(token, progress=1.0, status="done", url="/audio-proc/" + token)
+        else:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+            _set_job(token, status="error")
+    except (OSError, subprocess.SubprocessError):
+        _set_job(token, status="error")
+
+
+def start_process_job(rel: str, level: str):
+    """Ensure a denoised render of `rel` at `level` is cached or building.
+    Returns (token, ready, url) — ready True if the file already exists — or None
+    on bad input. A build already in flight isn't restarted."""
+    if level not in PROC_LEVELS:
+        return None
+    chain = proc_chain(level)
+    src = safe_audio_path(rel)
+    if not src or not chain:
+        return None
+    token = _proc_token(rel, chain, src.stat().st_mtime)
+    out = PROC_CACHE / token
+    if out.exists():
+        return token, True, "/audio-proc/" + token
+    with _proc_jobs_lock:
+        job = _proc_jobs.get(token)
+        if job and job["status"] == "running":
+            return token, False, None
+        if job and job["status"] == "done" and out.exists():
+            return token, True, job["url"]
+        _proc_jobs[token] = {"progress": 0.0, "status": "running", "url": None}
+    threading.Thread(target=_proc_worker, args=(token, src, chain, out),
+                     daemon=True).start()
+    return token, False, None
+
+
+def process_status(token: str):
+    """Status dict for a render job/token: {ready, progress, url?, error?}."""
+    if safe_proc_path(token):
+        return {"ready": True, "progress": 1.0, "url": "/audio-proc/" + token}
+    with _proc_jobs_lock:
+        job = _proc_jobs.get(token)
+    if not job:
+        return {"ready": False, "progress": 0.0, "error": "unknown"}
+    if job["status"] == "error":
+        return {"ready": False, "progress": 0.0, "error": "failed"}
+    if job["status"] == "done":
+        return {"ready": True, "progress": 1.0, "url": job["url"]}
+    return {"ready": False, "progress": job["progress"]}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):
         pass
@@ -530,6 +689,7 @@ class Handler(BaseHTTPRequestHandler):
             ".m4a": "audio/mp4",
             ".wav": "audio/wav",
             ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
         }.get(ext, "application/octet-stream")
         try:
             if rng and rng.startswith("bytes="):
@@ -645,9 +805,35 @@ class Handler(BaseHTTPRequestHandler):
             self._send_audio(p)
             return
 
-        if path == "/api/audio/waveform":
+        if path == "/api/audio/process":
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             rel = urllib.parse.unquote(qs.get("clip", [""])[0])
+            level = qs.get("level", [""])[0]
+            res = start_process_job(rel, level)
+            if not res:
+                self._send_json({"error": "bad request"}, 400)
+                return
+            token, ready, url = res
+            self._send_json({"token": token, "ready": ready, "url": url})
+            return
+
+        if path == "/api/audio/process-status":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            token = qs.get("token", [""])[0]
+            self._send_json(process_status(token))
+            return
+
+        if path.startswith("/audio-proc/"):
+            token = urllib.parse.unquote(path[len("/audio-proc/"):])
+            p = safe_proc_path(token)
+            if not p:
+                self._send(b"not found", "text/plain", 404)
+                return
+            self._send_audio(p)
+            return
+
+        if path == "/api/audio/waveform":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             try:
                 start = max(0.0, float(qs.get("start", ["0"])[0]))
                 dur = float(qs.get("dur", ["0"])[0])
@@ -655,7 +841,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 self._send_json({"error": "bad params"}, 400)
                 return
-            p = safe_audio_path(rel)
+            # Source can be an original clip (clip=…) or a processed render
+            # (proc=<token>) so the waveform matches whatever is being played.
+            proc = qs.get("proc", [""])[0]
+            if proc:
+                p = safe_proc_path(proc)
+            else:
+                p = safe_audio_path(urllib.parse.unquote(qs.get("clip", [""])[0]))
             if not p or dur <= 0:
                 self._send_json({"error": "not found"}, 404)
                 return

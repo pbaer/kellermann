@@ -7,3 +7,5 @@
 **/.claude/
 # Precomputed audio waveform peak caches (derived from the source mp3s).
 **/*.peaks
+# Cached denoised audio renders (derived from the source mp3s).
+**/.proc-cache/

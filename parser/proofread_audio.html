@@ -194,12 +194,20 @@
   #audio-bar button:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(1) brightness(0.55); }
   #audio-bar button.primary { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
   #audio-bar button.primary:hover { background: #d8b878; border-color: #d8b878; color: #1a1510; }
-  #audio-bar .speed-group { display: flex; gap: 0; align-items: center; }
-  #audio-bar .speed-group button { border-radius: 0; border-right: none; padding: 4px 8px; }
-  #audio-bar .speed-group button:first-child { border-radius: 2px 0 0 2px; }
-  #audio-bar .speed-group button:last-child { border-right: 1px solid #4a3f32; border-radius: 0 2px 2px 0; }
-  #audio-bar .speed-group button.active { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
+  #audio-bar .speed-group, #audio-bar .proc-group { display: flex; gap: 0; align-items: center; }
+  #audio-bar .speed-group button, #audio-bar .proc-group button { border-radius: 0; border-right: none; padding: 4px 8px; }
+  #audio-bar .speed-group button:first-child, #audio-bar .proc-group button:first-child { border-radius: 2px 0 0 2px; }
+  #audio-bar .speed-group button:last-child, #audio-bar .proc-group button:last-child { border-right: 1px solid #4a3f32; border-radius: 0 2px 2px 0; }
+  #audio-bar .speed-group button.active, #audio-bar .proc-group button.active { background: #c9a86a; color: #2a2520; border-color: #c9a86a; font-weight: bold; }
   #audio-bar .label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8a7a5a; }
+  /* Denoise status: a progress bar while rendering, a short label otherwise. */
+  #audio-bar .proc-status { display: inline-flex; align-items: center; gap: 6px; font-size: 0.72rem; letter-spacing: 0.03em; font-variant-numeric: tabular-nums; min-width: 6em; }
+  #audio-bar .proc-bar { display: none; width: 72px; height: 7px; background: #1a1510; border: 1px solid #6a5a3a; border-radius: 4px; overflow: hidden; }
+  #audio-bar .proc-status.processing .proc-bar { display: inline-block; }
+  #audio-bar .proc-bar-fill { display: block; height: 100%; width: 0; background: #c9a86a; transition: width 0.2s linear; }
+  #audio-bar .proc-status.processing .proc-label { color: #d8b878; }
+  #audio-bar .proc-status.on .proc-label { color: #9bbd6a; }
+  #audio-bar .proc-status.error .proc-label { color: #d98a7a; }
   #audio-bar.no-audio { background: #4a3f32; color: #8a7a5a; }
 
   /* Waveform scrubber — a canvas amplitude envelope spanning the full width,
@@ -498,6 +506,17 @@
           <button data-speed="1.25">1.25×</button>
           <button data-speed="1.5">1.5×</button>
         </div>
+        <span class="label" title="Reduce background hiss/static on this clip (cached after first use)">Denoise</span>
+        <div class="proc-group" id="proc-group">
+          <button data-level="off" class="active">Off</button>
+          <button data-level="low">Low</button>
+          <button data-level="medium">Med</button>
+          <button data-level="high">High</button>
+        </div>
+        <span class="proc-status" id="proc-status">
+          <span class="proc-bar" id="proc-bar"><span class="proc-bar-fill" id="proc-bar-fill"></span></span>
+          <span class="proc-label" id="proc-label"></span>
+        </span>
       </div>
       <div id="waveform-wrap" title="Click or drag to scrub">
         <canvas id="waveform"></canvas>
@@ -575,6 +594,17 @@ let blockStart = 0;      // seconds in source file at which current block begins
 let blockEnd = null;     // seconds in source at which next block begins; null = use audio.duration
 let scrubbing = false;
 const AUTOPLAY_KEY = "audio_proofread.autoplay";
+
+// Optional noise reduction. `procLevel` is a global strength (off/low/medium/
+// high) applied to whichever clip is active; the cleaned render is fetched once
+// per clip+level and cached here so re-selecting is instant.
+const PROC_KEY = "audio_proofread.procLevel";
+const PROC_LEVELS = ["off", "low", "medium", "high"];
+let procLevel = "off";
+let procReqToken = 0;
+const procUrlCache = new Map();   // `${clip}|${level}` -> processed audio url
+let procCleaning = false;         // a render is in progress for the active block
+let procResume = false;           // resume playback when the render completes
 
 async function api(url, opts) {
   const r = await fetch(url, opts || {});
@@ -789,18 +819,18 @@ function leadInStart() {
 }
 
 // Mirror of leadInStart() at the tail end: play ~2 seconds past the block's
-// logical end so a little of the next segment is audible for context. Clamped
-// to the clip duration when known, so we never run past the end of the file —
-// the last block in a clip just plays to its end. Returns null only when no end
-// is known yet (no next block and duration not loaded).
+// logical end so a little of the next segment is audible for context.
+//
+// For a normal block this is purely transcript-derived (blockEnd + 2) and must
+// NOT depend on audio.duration: an <audio> element's reported duration for an
+// MP3 starts as an estimate and refines while it loads, so clamping the window
+// to it made the playhead's denominator drift (running ahead or behind until
+// the duration settled). Only the last block in a clip — which has no next
+// block to bound it — falls back to the file duration once that's known.
 function leadOutEnd() {
-  const audio = $("audio");
-  const base = blockEnd != null
-    ? blockEnd
-    : (Number.isFinite(audio.duration) ? audio.duration : null);
-  if (base == null) return null;
-  const extended = base + 2;
-  return Number.isFinite(audio.duration) ? Math.min(extended, audio.duration) : extended;
+  if (blockEnd != null) return blockEnd + 2;
+  const dur = $("audio").duration;
+  return Number.isFinite(dur) ? dur : null;
 }
 
 function blockDuration() {
@@ -901,8 +931,15 @@ function loadWaveform() {
   wfWinEnd = winEnd;
   positionWaveformOverlays();
   const dur = Math.max(0.1, winEnd - winStart);
-  const clip = currentBlock.clip;
-  const key = `${clip}|${winStart.toFixed(2)}|${dur.toFixed(2)}`;
+  // Draw the waveform from whatever file is actually playing — the processed
+  // (denoised) render when active, else the original clip — so the waveform's
+  // timeline is identical to the audio and the playhead lines up exactly.
+  const src = $("audio").src || "";
+  const m = src.match(/\/audio-proc\/([0-9a-f]{16}\.[a-z0-9]+)/);
+  const srcParam = m ? `proc=${encodeURIComponent(m[1])}`
+                     : `clip=${encodeURIComponent(currentBlock.clip)}`;
+  const srcKey = m ? `proc:${m[1]}` : `clip:${currentBlock.clip}`;
+  const key = `${srcKey}|${winStart.toFixed(2)}|${dur.toFixed(2)}`;
   if (wfCache.has(key)) {
     wfPeaks = wfCache.get(key);
     renderWaveform();
@@ -911,7 +948,7 @@ function loadWaveform() {
   wfPeaks = null;
   clearWaveform();
   const token = ++wfReqToken;
-  const url = `/api/audio/waveform?clip=${encodeURIComponent(clip)}`
+  const url = `/api/audio/waveform?${srcParam}`
     + `&start=${winStart.toFixed(3)}&dur=${dur.toFixed(3)}&buckets=${WF_BUCKETS}`;
   fetch(url).then(r => r.ok ? r.json() : null).then(data => {
     if (token !== wfReqToken) return;          // a newer block was selected meanwhile
@@ -957,18 +994,112 @@ function updateAudioForBlock() {
 
   const target = leadInStart();
   const shouldPlay = autoplayEnabled();
-  if (audioUrl !== lastLoadedAudio) {
-    pendingSeek = target;
-    pendingPlay = shouldPlay;
-    audio.src = audioUrl;
-    audio.load();
-    lastLoadedAudio = audioUrl;
-  } else {
-    try { audio.currentTime = target; } catch { pendingSeek = target; }
-    if (shouldPlay) audio.play().catch(() => {});
-  }
+  resolveAudioSource(audioUrl, target, shouldPlay);
   loadWaveform();
   updateAudioPosition();
+}
+
+// Point the <audio> at `url`, seeking to `seekTo` and optionally playing. If
+// it's already the loaded source, just seek (no reload) — this keeps within-clip
+// navigation gap-free.
+function setAudioSrc(url, seekTo, play) {
+  const audio = $("audio");
+  if (url === lastLoadedAudio && audio.src) {
+    try { audio.currentTime = seekTo; } catch { pendingSeek = seekTo; }
+    if (play) audio.play().catch(() => {});
+    return;
+  }
+  pendingSeek = seekTo;
+  pendingPlay = play;
+  audio.src = url;
+  audio.load();
+  lastLoadedAudio = url;
+}
+
+// Choose the audio file for the current block: the original when denoise is
+// Off, otherwise the cached denoised render. When a render is needed we pause
+// playback while it runs (showing a progress bar) and resume on completion —
+// unless the user explicitly paused in the meantime. A token (bumped on every
+// call) supersedes any in-flight render handling when the block or level
+// changes.
+async function resolveAudioSource(origUrl, seekTo, shouldPlay) {
+  const block = currentBlock;
+  const audio = $("audio");
+  const token = ++procReqToken;       // supersede any earlier in-flight handling
+  if (procLevel === "off") {
+    procCleaning = false;
+    setProcStatus("");
+    setAudioSrc(origUrl, seekTo, shouldPlay);
+    return;
+  }
+  const ckey = `${block.clip}|${procLevel}`;
+  const known = procUrlCache.get(ckey);
+  if (known) {                        // already rendered this clip+level — use it
+    procCleaning = false;
+    setProcStatus("on");
+    setAudioSrc(known, seekTo, shouldPlay);
+    return;
+  }
+  // Needs rendering: load the original at the right spot but pause while we
+  // clean, remembering whether to resume when it's ready.
+  setAudioSrc(origUrl, seekTo, false);
+  audio.pause();
+  procCleaning = true;
+  procResume = shouldPlay;
+  setProcStatus("processing", 0);
+  try {
+    const start = await api(`/api/audio/process?clip=${encodeURIComponent(block.clip)}&level=${procLevel}`);
+    if (token !== procReqToken || currentBlock !== block) return;   // superseded
+    if (start && start.ready && start.url) { finishClean(block, ckey, token, start.url); return; }
+    if (!start || !start.token) { failClean(token); return; }
+    pollClean(block, ckey, token, start.token);
+  } catch {
+    failClean(token);
+  }
+}
+
+function pollClean(block, ckey, token, jobToken) {
+  const tick = async () => {
+    if (token !== procReqToken) return;        // superseded — stop polling
+    let s;
+    try { s = await api(`/api/audio/process-status?token=${encodeURIComponent(jobToken)}`); }
+    catch { failClean(token); return; }
+    if (token !== procReqToken) return;
+    if (s.ready && s.url) { finishClean(block, ckey, token, s.url); return; }
+    if (s.error) { failClean(token); return; }
+    setProcStatus("processing", s.progress || 0);
+    setTimeout(tick, 350);
+  };
+  tick();
+}
+
+function finishClean(block, ckey, token, url) {
+  procUrlCache.set(ckey, url);                 // cache even if superseded — useful later
+  if (token !== procReqToken || currentBlock !== block) return;
+  procCleaning = false;
+  const audio = $("audio");
+  const pos = audio.src ? audio.currentTime : leadInStart();
+  setAudioSrc(url, pos, procResume);
+  setProcStatus("on");
+}
+
+function failClean(token) {
+  if (token !== procReqToken) return;
+  procCleaning = false;
+  setProcStatus("error");
+}
+
+function setProcStatus(state, progress) {
+  const el = $("proc-status");
+  el.className = "proc-status" + (state ? " " + state : "");
+  if (state === "processing") {
+    const pct = Math.round((progress || 0) * 100);
+    $("proc-bar-fill").style.width = pct + "%";
+    $("proc-label").textContent = pct + "%";
+  } else {
+    $("proc-label").textContent = state === "on" ? "Cleaned"
+      : state === "error" ? "Failed" : "";
+  }
 }
 
 function updateAudioPosition() {
@@ -988,6 +1119,7 @@ function updateAudioPosition() {
 
 function playFromStart() {
   if (!currentBlock || !currentBlock.clip) return;
+  if (procCleaning) procResume = true;   // explicit play means resume when clean
   const audio = $("audio");
   const target = leadInStart();
   const seek = () => {
@@ -1185,6 +1317,8 @@ $("btn-play-pause").addEventListener("click", () => {
   } else {
     audio.pause();
   }
+  // Explicit play/pause during a clean overrides whether we auto-resume after.
+  if (procCleaning) procResume = !audio.paused;
 });
 
 function seekToScrubber(e) {
@@ -1230,6 +1364,32 @@ $("speed-group").addEventListener("click", e => {
   document.querySelectorAll("#speed-group button").forEach(b =>
     b.classList.toggle("active", Number(b.dataset.speed) === saved));
 }
+
+// Denoise strength selector — applies to the active clip (cached per clip+level).
+{
+  const saved = localStorage.getItem(PROC_KEY);
+  if (PROC_LEVELS.includes(saved)) procLevel = saved;
+  document.querySelectorAll("#proc-group button").forEach(b =>
+    b.classList.toggle("active", b.dataset.level === procLevel));
+}
+$("proc-group").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-level]");
+  if (!btn || btn.dataset.level === procLevel) return;
+  procLevel = btn.dataset.level;
+  localStorage.setItem(PROC_KEY, procLevel);
+  document.querySelectorAll("#proc-group button").forEach(b =>
+    b.classList.toggle("active", b === btn));
+  // Re-resolve the current block's audio at the new level, keeping position.
+  if (currentBlock && currentBlock.clip && currentBlock.start_seconds != null) {
+    const audio = $("audio");
+    const pos = audio.src ? audio.currentTime : leadInStart();
+    const wasPlaying = audio.src ? !audio.paused : false;
+    resolveAudioSource(currentBlock.audio_url, pos, wasPlaying);
+  } else {
+    setProcStatus("");
+  }
+});
+
 $("audio").addEventListener("ratechange", () => {
   // Keep in sync if browser changes rate via its own controls.
   const r = $("audio").playbackRate;
