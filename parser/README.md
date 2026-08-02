@@ -21,6 +21,30 @@ render_pages.py renders all PDF pages to PNG at 200 DPI (called separately, one-
 
 `out/` is git-ignored intermediate state. The site reads from `data/`.
 
+## Setup
+
+One-time, from this directory. The pipeline is Python plus two external binaries.
+
+**System packages** (Debian/Ubuntu names; install via your package manager):
+
+- `python3-venv` — e.g. `python3.14-venv` on Ubuntu 26.04. Needed to create the venv; Ubuntu strips `ensurepip`, so plain `python3 -m venv` fails without it.
+- `ffmpeg` — audio waveform decode + denoising (`precompute_waveforms.py`, the audio proofreader). Must be on `PATH`.
+- `tesseract-ocr` **and** `tesseract-ocr-deu` — `map_pdf.py` calls PyMuPDF's `get_textpage_ocr(language="deu")`, which drives Tesseract with the German language data. Without the `deu` data the OCR step fails.
+
+```sh
+sudo apt-get install -y python3.14-venv ffmpeg tesseract-ocr tesseract-ocr-deu
+```
+
+**Python venv** — `pymupdf` is the only third-party dependency:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install pymupdf
+```
+
+`fetch_rnnoise_model.py` (optional) downloads the RNNoise model for the audio proofreader's High denoise — see the bottom of this file.
+
 ## Running
 
 ```sh
@@ -65,6 +89,8 @@ If a split/merge straddles a chapter boundary, `expected_boundaries` and the `LE
 ## Proofreading workflow
 
 Each letter in the per-year JSON has either a `pdf_page` (exact) or a `pdf_page_range` (narrow range when OCR missed the date). Open the matching `out/pages/page-NNN.png` alongside the `.txt` to spot OCR errors.
+
+**Run `render_pages.py` first, or the PDF pane is blank (black).** The proofreader serves the scanned pages from `out/pages/page-NNN.png` (via `/page/<n>.png`); if that directory is empty the right-hand pane renders black. `out/` is git-ignored, so the renders are local-only — re-run `render_pages.py` once after a fresh checkout or any time you wipe `out/`. It's a slow one-time step (167 pages at 200 DPI), which is why `run.sh` deliberately does *not* call it.
 
 For an interactive tool, run the local proofreading app:
 
