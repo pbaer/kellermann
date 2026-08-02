@@ -169,6 +169,7 @@
     flex-wrap: wrap;
   }
   #audio-bar #btn-play-pause { width: 38px; padding: 4px 0; font-size: 0.95rem; line-height: 1; }
+  #audio-bar #btn-to-start { width: 34px; padding: 4px 0; font-size: 0.95rem; line-height: 1; }
   #audio-bar .scrubber-time {
     font-family: "Courier New", Courier, monospace;
     font-size: 0.78rem;
@@ -491,12 +492,12 @@
 
     <div id="audio-bar">
       <div class="transport-row">
-        <button id="btn-play-from-start" class="primary" title="Play from block start (Ctrl+Shift+Space)">▶ Play from start</button>
+        <button id="btn-play-pause" class="primary" title="Play/pause">▶</button>
+        <button id="btn-to-start" title="Play from block start (Ctrl+Shift+Space)">⏮</button>
         <div class="seek-controls">
           <button id="btn-back-3" title="Skip back 3s">−3s</button>
           <button id="btn-fwd-3" title="Skip forward 3s">+3s</button>
         </div>
-        <button id="btn-play-pause" title="Play/pause">▶</button>
         <span class="scrubber-time" id="scrubber-time">0:00 / 0:00</span>
         <audio id="audio" preload="metadata" hidden></audio>
         <span class="label">Speed</span>
@@ -973,8 +974,7 @@ function updateAudioForBlock() {
   const hasAudio = !!(currentBlock && currentBlock.clip && currentBlock.start_seconds != null);
   const audioUrl = hasAudio ? currentBlock.audio_url : "";
   const playbackBtns = [
-    $("btn-play-from-start"), $("btn-back-3"), $("btn-fwd-3"),
-    $("btn-play-pause"),
+    $("btn-play-pause"), $("btn-to-start"), $("btn-back-3"), $("btn-fwd-3"),
     ...document.querySelectorAll("#speed-group button"),
   ];
   $("waveform-wrap").classList.toggle("no-audio", !audioUrl);
@@ -1290,7 +1290,7 @@ $("btn-mark-proofread").addEventListener("click", async () => {
 $("btn-prev").addEventListener("click", () => selectBlockByIdx(currentIdx - 1));
 $("btn-next").addEventListener("click", () => selectBlockByIdx(currentIdx + 1));
 
-$("btn-play-from-start").addEventListener("click", playFromStart);
+$("btn-to-start").addEventListener("click", playFromStart);
 $("btn-back-3").addEventListener("click", () => {
   const a = $("audio");
   if (!a.src) return;
@@ -1468,7 +1468,7 @@ document.addEventListener("keydown", e => {
     swapSpeakerAtCursor();
   } else if (isMod && e.shiftKey && e.code === "Space") {
     e.preventDefault();
-    if (!$("btn-play-from-start").disabled) playFromStart();
+    if (!$("btn-to-start").disabled) playFromStart();
   }
 });
 
