@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
-"""Local HTML-based proofreading tool for kriegstagebuch letters.
+"""Letters mode of the proofreading tool (mounted by proofread.py).
 
-Serves an editor UI at http://localhost:8765 where each letter's raw slice of
-its source .txt can be edited against its scanned page image. Committing
-writes back to the source .txt atomically and updates in-memory line numbers
-for downstream letters.
+Provides the State + request handler for an editor UI where each letter's raw
+slice of its source .txt can be edited against its scanned page image.
+Committing writes back to the source .txt atomically, then re-runs the derived
+pipeline (parse.py -> map_pdf.py -> build_chapter_letters.py) so tools/out/
+and data/chapter-XX/letters.jsonl stay in sync, and reloads State from the
+fresh output (so splits/merges renumber letters correctly).
 
 Requires that parse.py (and optionally map_pdf.py and render_pages.py) has
-already been run so that parser/out/kriegstagebuch-YYYY.json exists.
+already been run so that tools/out/kriegstagebuch-YYYY.json exists.
 """
 from __future__ import annotations
 
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,7 +27,6 @@ DOCS = ROOT / "sources" / "documents"
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
 YEARS = list(range(1939, 1946))
-PORT = 8765
 PROOFREAD_MARKER = ">>>>>"
 # PDF page dimensions in points (A4, same for every page in this PDF).
 PAGE_WIDTH_PT = 595.2
@@ -266,6 +268,37 @@ class State:
 
 STATE = State()
 
+# Steps that derive tools/out/ and data/ from the source .txt files. All three
+# together take well under a second (map_pdf.py reuses the cached OCR).
+PIPELINE = [
+    ["parse.py", "--all"],
+    ["map_pdf.py"],
+    ["build_chapter_letters.py"],
+]
+
+
+def rebuild_derived() -> dict:
+    """Re-run the pipeline and reload STATE from its output.
+
+    Called after every write to a source .txt. Returns
+    {"ok": True} or {"ok": False, "step": ..., "output": ...} so the client
+    can surface a failure — the .txt edit itself is already saved either way.
+    """
+    global STATE
+    result = {"ok": True}
+    for step in PIPELINE:
+        r = subprocess.run([sys.executable, *step], cwd=HERE,
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            out = (r.stdout + r.stderr).strip()
+            print(f"Rebuild failed at {' '.join(step)}:\n{out}", file=sys.stderr)
+            result = {"ok": False, "step": " ".join(step), "output": out[-2000:]}
+            break
+    # Reload even after a failed step: the .txt was written, and State only
+    # needs whatever tools/out/ JSON exists (reconcile() re-derives lines).
+    STATE = State()
+    return result
+
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):
@@ -389,7 +422,8 @@ class Handler(BaseHTTPRequestHandler):
             if not STATE.save_letter(lid, new_text):
                 self._send_json({"error": "save failed"}, 400)
                 return
-            self._send_json({"ok": True, "letters": STATE.summaries()})
+            rebuild = rebuild_derived()
+            self._send_json({"ok": True, "letters": STATE.summaries(), "rebuild": rebuild})
             return
 
         m = re.fullmatch(r"/api/mark-proofread/(\d{4}-\d{4})", path)
@@ -398,25 +432,9 @@ class Handler(BaseHTTPRequestHandler):
             if not STATE.mark_as_proofread(lid):
                 self._send_json({"error": "not the next letter after the current proofread boundary"}, 400)
                 return
-            self._send_json({"ok": True, "letters": STATE.summaries()})
+            rebuild = rebuild_derived()
+            self._send_json({"ok": True, "letters": STATE.summaries(), "rebuild": rebuild})
             return
 
         self._send_json({"error": "not found"}, 404)
 
-
-def main() -> int:
-    if not STATE.letters:
-        print("No letters loaded. Did you run parse.py first?", file=sys.stderr)
-        return 1
-    server = HTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"Proofreader serving at http://localhost:{PORT}  ({len(STATE.letters)} letters)")
-    print("Ctrl+C to stop.")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print()
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

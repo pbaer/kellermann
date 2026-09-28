@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Local HTML-based proof-listening tool for the audio interview transcript.
+"""Audio mode of the proofreading tool (mounted by proofread.py).
 
-Serves an editor UI at http://localhost:8766 where each timestamped block of
+Provides the State + request handler for an editor UI where each timestamped block of
 transcript text can be edited while playing back the corresponding audio
 from its starting timestamp. Committing writes back to
 sources/audio/transcript.txt atomically.
@@ -22,7 +22,7 @@ import sys
 import threading
 import urllib.parse
 from array import array
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,7 +30,6 @@ AUDIO_ROOT = ROOT / "sources" / "audio"
 MAPS_ROOT = ROOT / "sources" / "maps"
 TRANSCRIPT = AUDIO_ROOT / "transcript.txt"
 HERE = Path(__file__).resolve().parent
-PORT = 8766
 MAP_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 PROOFREAD_MARKER = ">>>>>"
 ANNOTATION_MARKER = "#####"
@@ -921,22 +920,3 @@ class Handler(BaseHTTPRequestHandler):
 
         self._send_json({"error": "not found"}, 404)
 
-
-def main() -> int:
-    if not STATE.blocks:
-        print("No transcript blocks parsed.", file=sys.stderr)
-        return 1
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    server.daemon_threads = True
-    print(f"Audio proof-listener serving at http://localhost:{PORT}  "
-          f"({len(STATE.blocks)} blocks)")
-    print("Ctrl+C to stop.")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print()
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

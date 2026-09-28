@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render each page of sources/documents/kriegstagebuch.pdf to a PNG.
 
-Output: parser/out/pages/page-001.png … page-NNN.png
+Output: tools/out/pages/page-001.png … page-NNN.png
 Page 1 is the cover; page N (N>=2) corresponds to typewriter page N-1.
 """
 from pathlib import Path

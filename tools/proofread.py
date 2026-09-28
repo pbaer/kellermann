@@ -37,8 +37,8 @@ import proofread_audio as audio_mod
 HERE = Path(__file__).resolve().parent
 PORT = 8770
 
-# The letters State (proofread_letters.py) was written for a single-threaded server and
-# mutates line numbers in place on save. We now serve on a threading server
+# The letters State (proofread_letters.py) mutates line numbers in place on save,
+# and is replaced wholesale when a save triggers the rebuild pipeline. We now serve on a threading server
 # (audio streaming would otherwise block every other request), so serialize all
 # letters reads/writes through one lock. The audio State has its own lock.
 LETTERS_LOCK = threading.Lock()

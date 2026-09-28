@@ -17,8 +17,8 @@ passes:
     get flagged `bbox_approx: true` so the UI can distinguish them.
 
 Output:
-  parser/out/ocr.jsonl         — one page per line, list of {text, bbox}
-  parser/out/letter_pages.json — [{letter_id, header, pdf_page, content_page,
+  tools/out/ocr.jsonl         — one page per line, list of {text, bbox}
+  tools/out/letter_pages.json — [{letter_id, header, pdf_page, content_page,
                                    ocr_snippet, bbox, bbox_approx, page_range}]
 """
 from __future__ import annotations

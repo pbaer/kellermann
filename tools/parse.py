@@ -5,9 +5,9 @@ Extracts letters (with author, location, date, body paragraphs, inline
 parentheticals) plus front matter, OCR notes and proofread markers into JSON.
 
 Usage:
-    python parser/parse.py --all
-    python parser/parse.py --year 1940
-    python parser/parse.py --verify-only
+    python tools/parse.py --all
+    python tools/parse.py --year 1940
+    python tools/parse.py --verify-only
 """
 from __future__ import annotations
 

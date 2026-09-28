@@ -1,6 +1,6 @@
-# parser
+# tools
 
-Turns the `sources/documents/kriegstagebuch-YYYY.txt` files into structured JSON, maps each letter to its page in `sources/documents/kriegstagebuch.pdf` for OCR proofreading, and produces the per-chapter `letters.jsonl` files that the website reads.
+Turns the `sources/documents/kriegstagebuch-YYYY.txt` files into structured JSON, maps each letter to its page in `sources/documents/kriegstagebuch.pdf` for OCR proofreading, and produces the per-chapter `letters.jsonl` files that the website reads. Also hosts the local proofreading tool for the letters and the audio transcript.
 
 ## Pipeline
 
@@ -19,7 +19,7 @@ out/kriegstagebuch-YYYY.json + data/chapter-XX/chronology.jsonl
 render_pages.py renders all PDF pages to PNG at 200 DPI (called separately, one-time).
 ```
 
-`out/` is git-ignored intermediate state. The site reads from `data/`.
+`out/` is git-ignored intermediate state (~140 MB with the page renders); delete it anytime to start clean, then re-run `render_pages.py` and `run.sh`. The OCR cache is rebuilt on the next `map_pdf.py` run (slow). The site reads from `data/`.
 
 ## Setup
 
@@ -39,11 +39,8 @@ sudo apt-get install -y python3.14-venv ffmpeg tesseract-ocr tesseract-ocr-deu
 
 ```sh
 python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install pymupdf
+.venv/bin/python -m pip install -r requirements.txt
 ```
-
-`fetch_rnnoise_model.py` (optional) downloads the RNNoise model for the audio proofreader's High denoise — see the bottom of this file.
 
 ## Running
 
@@ -60,22 +57,21 @@ The OCR cache (`out/ocr.jsonl`) is reused unless deleted.
 
 The `.txt` files under `sources/documents/` are the source of truth. Anything in `data/chapter-XX/letters.jsonl` is derived from them and gets overwritten.
 
-**Typo / wording fix inside one letter** (no change to letter count or boundaries):
+**Edits made in the proofreading tool** are propagated automatically: every commit (and every "Mark as proofread") re-runs `parse.py → map_pdf.py → build_chapter_letters.py` (well under a second) and reloads the tool's state, so `data/` is always in sync with the `.txt` files. If a step fails, the `.txt` edit is still saved and the tool shows an alert with the failing step's output.
+
+**Edits made outside the tool** (in an editor, or via git): run
 
 ```sh
-./run.sh    # parse → map_pdf → build_chapter_letters → proofread server
+./run.sh    # parse → map_pdf → build_chapter_letters → waveforms → proofread server
 ```
 
-`./run.sh` from this directory does the full refresh in one shot. Or run the three Python steps individually if you don't want the proofreading server.
+or just the three Python steps if you don't want the proofreading server.
 
-**Splitting or merging a letter** (changes letter count, header lines change):
+**Splitting or merging a letter** needs no special handling. Letter ids (`YYYY-NNNN`) are sequence numbers within a year, so a split/merge renumbers every later letter in that year. `build_chapter_letters.py` compensates:
 
-Same command — `./run.sh`. The pipeline re-numbers letter ids (`YYYY-NNNN`) by source order within the year, so renumbering ripples through `data/chapter-XX/letters.jsonl` automatically. Watch the `build_chapter_letters.py` summary at the end:
-
-- `Per-chapter letter counts` should still total 515 (or whatever the current authoritative total is — the script asserts this).
-- `All boundary checks: OK` confirms the chapter-cut letter ids still match `expected_boundaries` in `build_chapter_letters.py`.
-
-If a split/merge straddles a chapter boundary, `expected_boundaries` and the `LETTER_CHAPTER_OVERRIDES` dict in `build_chapter_letters.py` may need updating.
+- It matches old and new ids by letter header and rewrites the `source_letters` references in `data/chapter-XX/chronology.jsonl` (printed as `[renumber] …`).
+- If a referenced letter was merged away, it can't guess the new target: it prints `REF ERROR …`, writes nothing under `data/`, and exits non-zero until you fix the reference by hand.
+- `All boundary checks: OK` confirms the first/last letter of each chapter still match `EXPECTED_BOUNDARIES` (keyed by author + date, so unaffected by renumbering). If you split/merge a chapter's first or last letter, update `EXPECTED_BOUNDARIES` (and `LETTER_CHAPTER_OVERRIDES` if it involves the pinned letter).
 
 **Chronology / location data** (`data/chapter-XX/chronology.jsonl`) is hand-curated, not generated. Edit those files directly. If you change `arrival_date` values you may rebucket which chapter a letter falls into — re-run `build_chapter_letters.py` to refresh.
 
@@ -106,16 +102,16 @@ This serves **one page with two modes** — toggle between them with the tabs at
 
 Both modes share the `>>>>>` proofread-marker convention and the same core keybindings (Ctrl+S commit, Ctrl+Shift+M mark-as-proofread). Each mode keeps its full state — including **uncommitted edits** — while you switch to the other, so you can flip over to check something and flip back untouched; a dot on the tab flags a mode with pending changes.
 
-`./run.sh` re-parses, re-maps pages, rebuilds the per-chapter letters and starts the combined server in one shot — use it after a session that changes letter structure.
+`./run.sh` re-parses, re-maps pages, rebuilds the per-chapter letters and starts the combined server in one shot — use it after editing the `.txt` files outside the tool.
 
 ### How it's wired
 
-`proofread.py` is a thin shell (page: `proofread.html`): it imports `proofread_letters.py` (letters) and `proofread_audio.py` (audio) and reuses their `State` + request handlers unchanged, mounting each tool's page in its own `<iframe>` (`/tool/letters` → `proofread_letters.html`, `/tool/audio` → `proofread_audio.html`) so all in-page state survives a mode switch. Those two modules are implementation details of the combined tool; each can still be run on its own (`proofread_letters.py` → 8765, `proofread_audio.py` → 8766) but the combined `proofread.py` is the one to use. All of them share `proofread_shared.js` for diff/search rendering.
+`proofread.py` is a thin shell (page: `proofread.html`): it imports `proofread_letters.py` (letters) and `proofread_audio.py` (audio) and reuses their `State` + request handlers unchanged, mounting each tool's page in its own `<iframe>` (`/tool/letters` → `proofread_letters.html`, `/tool/audio` → `proofread_audio.html`) so all in-page state survives a mode switch. Those two modules are implementation details of the combined tool and have no entry point of their own. Both pages share `proofread_shared.js` for diff/search rendering. The letters module's `rebuild_derived()` runs the pipeline after each write.
 
 The audio waveform is served by `/api/audio/waveform`, which slices a precomputed peak file. `precompute_waveforms.py` decodes each clip once (via **`ffmpeg`**) into a sidecar `"<clip>.mp3.peaks"` next to the mp3 — int16 (min,max) peaks at 200/sec — so the endpoint just slices the requested window out of it (sub-millisecond) instead of decoding on every block. `run.sh` runs it before launching the server (idempotent — skips clips whose sidecar is current), and the server also builds any missing sidecar lazily in the background, falling back to a windowed `ffmpeg` decode until it's ready. `ffmpeg` must be on `PATH`; the `.peaks` sidecars are derived caches and are git-ignored.
 
 Denoising: `/api/audio/process?clip=…&level=low|medium|high` starts a background render (returns a token; `ready:true` with a URL if already cached) and `/api/audio/process-status?token=…` reports `{ready, progress}` parsed from ffmpeg's `-progress` output, which the client shows as a progress bar. The filter chains live in `proc_chain()` in `proofread_audio.py`: low/medium are `afftdn`; **high** uses `arnndn` (RNNoise) when `models/rnnoise.rnnn` is present, else falls back to an aggressive `afftdn` chain. Renders are cached as **FLAC** under `sources/audio/.proc-cache/` (git-ignored), keyed by clip + exact filter chain + output format + source mtime, and `/audio-proc/<token>` serves them with range support. FLAC (not MP3) is deliberate: MP3 has no sample-accurate timestamps, so the browser estimates the playback timeline and `currentTime` drifts ahead of the audio during long playback — which made the playhead creep ahead only when denoise was on. FLAC is lossless with exact sample counts and no encoder delay, so the timeline stays sample-accurate (and matches the original's duration exactly). The trade-off is size — a FLAC render is several times larger than the source mp3; the cache is disposable, so delete `sources/audio/.proc-cache/` anytime to reclaim space. Each render also gets its own waveform peaks sidecar, and the waveform is drawn from whichever file is actually playing (`/api/audio/waveform?proc=<token>` for a render, `?clip=…` for the original) so the playhead lines up with the audio when denoise is on.
 
-The RNNoise model isn't committed; run `python fetch_rnnoise_model.py` once to download it (the "somnolent hogwash" voice model from GregorR/rnnoise-models) into `models/rnnoise.rnnn`. Without it, High still works via the afftdn fallback. To retune, edit `proc_chain()` — the cache invalidates on any chain change automatically.
+The RNNoise model is committed at `models/rnnoise.rnnn` (the "somnolent hogwash" voice model from GregorR/rnnoise-models, ~300 KB). If it's missing, High still works via the afftdn fallback. To retune, edit `proc_chain()` — the cache invalidates on any chain change automatically.
 
 See `schema.md` for the full output schema.

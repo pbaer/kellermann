@@ -623,18 +623,34 @@ $("btn-commit").addEventListener("click", async () => {
   });
   if (!r.ok) { alert("Save failed"); return; }
   const data = await r.json();
+  warnIfRebuildFailed(data);
+  const countChanged = data.letters.length !== letters.length;
   originalText = $("editor").value;
   letters = data.letters;
+  await refreshSearchIndex();
+  renderNav();
+  if (countChanged) {
+    // A split or merge renumbered the letters; reload this one so the editor
+    // shows only its (new) extent.
+    await selectLetterByIdx(currentIdx, /*force*/ true);
+    return;
+  }
   // Keep currentLetter in sync regarding proofread status
   const updated = letters[currentIdx];
   currentLetter.proofread = updated.proofread;
   currentLetter.is_next_to_proofread = updated.is_next_to_proofread;
-  await refreshSearchIndex();
-  renderNav();
   updateDirty();
   updateDiff();
   $("lh-proofread").hidden = !currentLetter.proofread;
 });
+
+// The server re-runs the pipeline (source .txt -> data/) after every write.
+// The .txt edit is saved either way; this just flags a stale data/.
+function warnIfRebuildFailed(data) {
+  if (data.rebuild && !data.rebuild.ok) {
+    alert(`Saved, but rebuilding data/ failed at ${data.rebuild.step}:\n\n${data.rebuild.output}`);
+  }
+}
 
 $("btn-discard").addEventListener("click", () => {
   $("editor").value = originalText;
@@ -651,6 +667,7 @@ $("btn-mark-proofread").addEventListener("click", async () => {
     return;
   }
   const data = await r.json();
+  warnIfRebuildFailed(data);
   letters = data.letters;
   await refreshSearchIndex();
   renderNav();

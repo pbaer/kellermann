@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Build per-chapter letters.jsonl files for the map page from parser output.
+Build per-chapter letters.jsonl files for the map page from parse.py output.
 
 Reads:
-- parser/out/kriegstagebuch-YYYY.json  (1939..1945)
+- tools/out/kriegstagebuch-YYYY.json  (1939..1945)
 - data/chapter-XX/chronology.jsonl  (chapters 01..07; language-agnostic layout)
 
 Writes:
 - data/chapter-XX/letters.jsonl  (one letter per line)
+- data/chapter-XX/chronology.jsonl  (only the `source_letters` id references,
+  and only when a split/merge renumbered letters — see below)
 
 Localizable text fields (header_raw, location_raw, body[].text,
 body[].parentheticals[].text) are emitted as { "de-DE": "..." } objects so the
@@ -19,32 +21,64 @@ chronology contains the latest entry with arrival_date <= letter.date.iso.
 This makes the chapter-cut points (last/first letter of each chapter) emergent
 from the chronology rebucketing already done in Phase A. Letters with a null
 date.iso fall back to line-order proximity to the surrounding dated letters.
+
+Letter ids (YYYY-NNNN) are sequence numbers within a year, so an OCR fix that
+splits or merges a letter renumbers everything after it in that year. To keep
+the hand-curated chronology's `source_letters` references pointing at the same
+letters, the previous letters.jsonl files are read before being overwritten,
+old and new ids are matched by header (plus occurrence index, since a few
+headers repeat), and changed ids are rewritten in chronology.jsonl. References
+to a letter whose header disappeared (merged away) can't be resolved
+automatically; they are reported, nothing under data/ is written (so the
+problem persists until fixed), and the script exits non-zero.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from bisect import bisect_right
 
 ROOT = Path(__file__).resolve().parent.parent
-PARSER_OUT = ROOT / 'parser' / 'out'
+PARSER_OUT = ROOT / 'tools' / 'out'
 DATA_DIR = ROOT / 'data'
 SOURCE_LOCALE = 'de-DE'
 YEARS = range(1939, 1946)
 
+# Letters below are identified by (author, date.iso) rather than by id, since
+# ids shift when letters are split or merged.
+
 # Narrative overrides where date-based bucketing places a letter in the wrong
-# chapter. Each entry pins a letter id to a specific chapter regardless of date.
+# chapter. Each entry pins a letter to a specific chapter regardless of date.
 #
-# 1945-0014: Wilhelm, 1945-03-26, "Den Haag" — courier letter sent as the V-2
-# division was being pulled out of Holland (Mar 24 night). Its date is past the
-# Ch7 chronology entry "Rückmarsch 1945-03-24", but narratively it closes the
-# V-2 chapter (Ch6) rather than opening the retreat (Ch7). The retreat opens
-# with 1945-0015 (1945-04-02, "auf dem Rückmarsch").
-LETTER_CHAPTER_OVERRIDES: dict[str, int] = {
-    '1945-0014': 6,
+# Wilhelm, 1945-03-26, "Den Haag" — courier letter sent as the V-2 division was
+# being pulled out of Holland (Mar 24 night). Its date is past the Ch7
+# chronology entry "Rückmarsch 1945-03-24", but narratively it closes the V-2
+# chapter (Ch6) rather than opening the retreat (Ch7). The retreat opens with
+# Wilhelm's letter of 1945-04-02 ("auf dem Rückmarsch").
+LETTER_CHAPTER_OVERRIDES: dict[tuple[str, str], int] = {
+    ('Wilhelm', '1945-03-26'): 6,
 }
+
+# Sanity check: the first/last letter of each chapter, as the plan says.
+EXPECTED_BOUNDARIES: list[tuple[int, str, tuple[str, str]]] = [
+    (1, 'last',  ('Wilhelm',  '1940-05-09')),
+    (2, 'first', ('Wilhelm',  '1940-05-12')),
+    (2, 'last',  ('Marianne', '1941-01-21')),
+    (3, 'first', ('Wilhelm',  '1941-01-23')),
+    (3, 'last',  ('Wilhelm',  '1941-06-10')),
+    (4, 'first', ('Wilhelm',  '1941-06-12')),
+    (4, 'last',  ('Marianne', '1943-02-04')),
+    (5, 'first', ('Wilhelm',  '1943-02-08')),
+    (5, 'last',  ('Wilhelm',  '1943-07-04')),
+    (6, 'first', ('Wilhelm',  '1943-10-15')),
+    (6, 'last',  ('Wilhelm',  '1945-03-26')),
+    (7, 'first', ('Wilhelm',  '1945-04-02')),
+]
+
+SOURCE_LETTERS_RE = re.compile(r'"source_letters": (\[[^\]]*\])')
 
 
 def load_chronology() -> list[tuple[str, int]]:
@@ -109,6 +143,76 @@ def localize_body(body: list[dict]) -> list[dict]:
     return out
 
 
+def ids_by_header_key(records: list[tuple[str, str]]) -> dict[tuple[str, int], str]:
+    """Map (header, occurrence index) -> id for [(id, header), ...] in source order."""
+    seen: dict[str, int] = {}
+    out: dict[tuple[str, int], str] = {}
+    for lid, header in records:
+        n = seen.get(header, 0)
+        seen[header] = n + 1
+        out[(header, n)] = lid
+    return out
+
+
+def load_previous_letters() -> list[tuple[str, str]]:
+    """[(id, header), ...] from the letters.jsonl files about to be overwritten."""
+    records = []
+    for ch in range(1, 8):
+        p = DATA_DIR / f'chapter-{ch:02d}' / 'letters.jsonl'
+        if not p.exists():
+            continue
+        with p.open() as f:
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    records.append((r['id'], r['header_raw'][SOURCE_LOCALE]))
+    records.sort(key=lambda t: t[0])  # YYYY-NNNN sorts in source order
+    return records
+
+
+def update_chronology_refs(previous: list[tuple[str, str]],
+                           current: list[tuple[str, str]],
+                           write: bool) -> list[str]:
+    """Rewrite chronology `source_letters` ids renumbered by a split/merge.
+
+    Returns a list of problems (references that don't resolve to a letter).
+    With write=False, only checks. Call once to check, then again to write
+    only if there were no problems.
+    """
+    header_by_old_id = dict(previous)
+    old_by_key = ids_by_header_key(previous)
+    new_by_key = ids_by_header_key(current)
+    remap = {old: new_by_key[k] for k, old in old_by_key.items()
+             if k in new_by_key and new_by_key[k] != old}
+    # Old ids whose letter no longer exists. Check these explicitly: after a
+    # merge the id string itself is typically reused by the following letter.
+    vanished = {old for k, old in old_by_key.items() if k not in new_by_key}
+    current_ids = {lid for lid, _ in current}
+    problems: list[str] = []
+
+    for ch in range(1, 8):
+        p = DATA_DIR / f'chapter-{ch:02d}' / 'chronology.jsonl'
+        text = p.read_text(encoding='utf-8')
+
+        def fix(m: re.Match) -> str:
+            ids = json.loads(m.group(1))
+            new_ids = [remap.get(i, i) for i in ids]
+            for old, new in zip(ids, new_ids):
+                if old in vanished or (old == new and new not in current_ids):
+                    header = header_by_old_id.get(old, '?')
+                    problems.append(f'chapter-{ch:02d}/chronology.jsonl references {old} '
+                                    f'("{header}"), which no longer exists '
+                                    f'(merged away?) — fix by hand')
+                elif old != new and write:
+                    print(f'  [renumber] chapter-{ch:02d}/chronology.jsonl: {old} -> {new}')
+            return f'"source_letters": {json.dumps(new_ids, ensure_ascii=False)}'
+
+        new_text = SOURCE_LETTERS_RE.sub(fix, text)
+        if write and new_text != text:
+            p.write_text(new_text, encoding='utf-8')
+    return problems
+
+
 def build_letter_record(entry: dict) -> dict:
     """Project a parser letter entry to the fields the map needs.
 
@@ -145,6 +249,7 @@ def main() -> int:
 
     null_date_count = 0
     total_letters = 0
+    current: list[tuple[str, str]] = []  # (id, header) in source order
 
     for year in YEARS:
         path = PARSER_OUT / f'kriegstagebuch-{year}.json'
@@ -183,8 +288,10 @@ def main() -> int:
                   file=sys.stderr)
 
         for i, e in enumerate(letters):
-            ch = LETTER_CHAPTER_OVERRIDES.get(e['id'], per_letter_chapter[i])
+            key = (e['author'], e['date'].get('iso'))
+            ch = LETTER_CHAPTER_OVERRIDES.get(key, per_letter_chapter[i])
             by_chapter[ch].append((year, e['line_start'], e))
+            current.append((e['id'], e['header_raw']))
             total_letters += 1
 
     # Sort within each chapter by source order (year, line_start).
@@ -192,28 +299,27 @@ def main() -> int:
         by_chapter[ch].sort(key=lambda t: (t[0], t[1]))
 
     # Sanity-check: verify the chapter boundary letters land where the plan says.
-    last_id = {ch: items[-1][2]['id'] for ch, items in by_chapter.items() if items}
-    first_id = {ch: items[0][2]['id'] for ch, items in by_chapter.items() if items}
-    expected_boundaries = [
-        (1, 'last',  '1940-0040'),
-        (2, 'first', '1940-0041'),
-        (2, 'last',  '1941-0007'),
-        (3, 'first', '1941-0008'),
-        (3, 'last',  '1941-0052'),
-        (4, 'first', '1941-0053'),
-        (4, 'last',  '1943-0011'),
-        (5, 'first', '1943-0012'),
-        (5, 'last',  '1943-0052'),
-        (6, 'first', '1943-0053'),
-        (6, 'last',  '1945-0014'),
-        (7, 'first', '1945-0015'),
-    ]
+    def key(e: dict) -> tuple[str, str]:
+        return (e['author'], e['date'].get('iso'))
+    last_key = {ch: key(items[-1][2]) for ch, items in by_chapter.items() if items}
+    first_key = {ch: key(items[0][2]) for ch, items in by_chapter.items() if items}
     boundary_ok = True
-    for ch, which, expected in expected_boundaries:
-        got = (last_id if which == 'last' else first_id).get(ch)
+    for ch, which, expected in EXPECTED_BOUNDARIES:
+        got = (last_key if which == 'last' else first_key).get(ch)
         if got != expected:
             boundary_ok = False
             print(f'  MISMATCH ch{ch} {which}: expected {expected}, got {got}')
+
+    # Keep chronology references stable across renumbering (must run before
+    # the old letters.jsonl files are overwritten).
+    previous = load_previous_letters()
+    ref_problems = update_chronology_refs(previous, current, write=False)
+    if ref_problems:
+        for msg in ref_problems:
+            print(f'  REF ERROR {msg}')
+        print('Not writing data/ until these references are fixed.')
+        return 1
+    update_chronology_refs(previous, current, write=True)
 
     # Write out files.
     for ch in range(1, 8):
@@ -243,7 +349,7 @@ def main() -> int:
     print()
     print(f'All boundary checks: {"OK" if boundary_ok else "FAILED"}')
 
-    return 0 if boundary_ok and total_letters == 515 else 1
+    return 0 if boundary_ok else 1
 
 
 if __name__ == '__main__':

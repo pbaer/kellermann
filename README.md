@@ -14,7 +14,7 @@ Originalquellen liegen unter `sources/`:
 
 Zu jeder `<datei>.pdf` in `sources/documents/` liegt eine zugehörige `<datei>.txt` mit der Transkription daneben.
 
-Die Textdateien sind chronologisch aufgebaut und die Quelle der Wahrheit. Alles unter `data/chapter-XX/letters.jsonl` wird daraus abgeleitet — siehe `parser/README.md` für die Pipeline und für die Schritte nach einer Korrektur an den `.txt`-Dateien (Tippfehler, Zusammenführen oder Aufteilen von Briefen). `data/chapter-XX/chronology.jsonl` ist dagegen handgepflegt und wird nicht regeneriert.
+Die Textdateien sind chronologisch aufgebaut und die Quelle der Wahrheit. Alles unter `data/chapter-XX/letters.jsonl` wird daraus abgeleitet — siehe `tools/README.md` für die Pipeline und für die Schritte nach einer Korrektur an den `.txt`-Dateien (Tippfehler, Zusammenführen oder Aufteilen von Briefen). `data/chapter-XX/chronology.jsonl` ist dagegen handgepflegt und wird nicht regeneriert.
 
 Jeder Brief beginnt mit einer Kopfzeile im Muster:
 
